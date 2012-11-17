@@ -1,6 +1,8 @@
 noinst_LTLIBRARIES += libmongo-glib.la
 
 libmongo_glib_la_SOURCES =
+libmongo_glib_la_SOURCES += $(top_srcdir)/cut-n-paste/guri.c
+libmongo_glib_la_SOURCES += $(top_srcdir)/cut-n-paste/guri.h
 libmongo_glib_la_SOURCES += $(top_srcdir)/mongo-glib/mongo-bson.c
 libmongo_glib_la_SOURCES += $(top_srcdir)/mongo-glib/mongo-bson.h
 libmongo_glib_la_SOURCES += $(top_srcdir)/mongo-glib/mongo-bson-stream.c
