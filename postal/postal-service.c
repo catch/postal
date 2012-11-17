@@ -1049,7 +1049,7 @@ postal_service_notify_cb (GObject      *object,
                g_object_unref(aps);
             }
          } else {
-            g_warning("Unkown device_type %s", device_type);
+            g_warning("Unknown device_type %s", device_type);
          }
       }
    }
