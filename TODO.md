@@ -2,7 +2,6 @@
 
  * Notification delivery.
  * Delay of notification delivery.
- * Handle device removal callbacks from services.
  * Add /status HTTP page.
 
 # Things that would be nice.
