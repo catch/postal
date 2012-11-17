@@ -1,0 +1,32 @@
+{
+  "collapse_key": "abcdefg",
+
+  "aps": {
+    "alert": "",
+    "badge": 0,
+    "sound": "",
+    "key": "value",
+    "key2": 123.45,
+    "key3": 456,
+    "key4": true,
+    "key5": [{"abc": "def"}]
+  },
+
+  "c2dm": {
+    "key": "value",
+    "key2": 123.45,
+    "key3": 456,
+    "key4": true
+  },
+
+  "gcm": {
+    "key": "value",
+    "key2": 123.45,
+    "key3": 456,
+    "key4": true,
+    "key5": [{"abc": "def"}]
+  },
+
+  "users": ["000011110000111100001111"],
+  "devices": []
+}

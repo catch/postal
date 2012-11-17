@@ -1,0 +1,28 @@
+noinst_LTLIBRARIES += libpush-glib.la
+
+libpush_glib_la_SOURCES =
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-client.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-client.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-identity.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-identity.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-message.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-aps-message.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-client.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-client.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-identity.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-identity.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-message.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-message.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-debug.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-identity.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-message.h
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-glib.h
+
+libpush_glib_la_CPPFLAGS =
+libpush_glib_la_CPPFLAGS += $(SOUP_CFLAGS)
+libpush_glib_la_CPPFLAGS += $(JSON_CFLAGS)
+libpush_glib_la_CPPFLAGS += -DG_LOG_DOMAIN="\"push\""
+
+libpush_glib_la_LIBADD =
+libpush_glib_la_LIBADD += $(SOUP_LIBS)
+libpush_glib_la_LIBADD += $(JSON_LIBS)
