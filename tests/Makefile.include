@@ -8,13 +8,13 @@ TEST_PROGS += test-postal-service
 TEST_PROGS += test-url-router
 
 test_postal_device_SOURCES = tests/test-postal-device.c
-test_postal_device_CPPFLAGS = $(MONGO_CFLAGS) $(JSON_CFLAGS) -I$(top_srcdir)
-test_postal_device_LDADD = $(MONGO_LIBS) libpostal.la
+test_postal_device_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib
+test_postal_device_LDADD = libpostal.la
 
 test_postal_service_SOURCES = tests/test-postal-service.c
-test_postal_service_CPPFLAGS = $(MONGO_CFLAGS) $(JSON_CFLAGS) -I$(top_srcdir)
-test_postal_service_LDADD = $(MONGO_LIBS) libpostal.la
+test_postal_service_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib
+test_postal_service_LDADD = libpostal.la
 
 test_url_router_SOURCES = tests/test-url-router.c
-test_url_router_CPPFLAGS = -I$(top_srcdir) $(MONGO_CFLAGS) $(SOUP_CFLAGS)
+test_url_router_CPPFLAGS = -I$(top_srcdir) $(SOUP_CFLAGS)
 test_url_router_LDADD = libpostal.la
