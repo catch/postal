@@ -1005,6 +1005,11 @@ postal_service_notify_cb (GObject      *object,
     *       seconds or so. (Then evict that message).
     */
 
+   /*
+    * TODO: We need to inflate all of the GCM identities together so that
+    *       we can send them a message via a single API call to Google.
+    */
+
    list = mongo_message_reply_get_documents(reply);
    for (; list; list = list->next) {
       if (mongo_bson_iter_init_find(&iter, list->data, "device_type")) {
