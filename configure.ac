@@ -29,16 +29,6 @@ PKG_CHECK_MODULES(JSON,  [json-glib-1.0 >= 0.14.0])
 
 
 dnl **************************************************************************
-dnl Check for libunistring
-dnl **************************************************************************
-AC_CHECK_HEADERS([unistr.h], [
-	utf8_support="libunistring; full UTF-8 support."
-], [
-	utf8_support="glib; only modified UTF-8."
-])
-
-
-dnl **************************************************************************
 dnl Check for Redis Support
 dnl **************************************************************************
 AC_ARG_ENABLE([redis],
@@ -52,10 +42,31 @@ AS_CASE([$enable_redis],
 		                 [AC_DEFINE([ENABLE_REDIS], [], [Support for Redis.])],
 		                 [AC_MSG_ERROR([Please install hiredis devel packages])])
 	],
-	[no], [],
+	[no], [
+	],
 	[AC_MSG_ERROR([Unknown argument to --enable-redis])]
 )
 AM_CONDITIONAL([ENABLE_REDIS], [test "x$enable_redis" = xyes])
+
+
+AC_ARG_ENABLE([unistring],
+	      [AS_HELP_STRING([--enable-unistring=@<:@no/yes@:>@],
+			     [Add support for full UTF-8.])],
+	      [],
+	      [enable_unistring=no])
+AS_CASE([$enable_unistring],
+	[yes], [
+		AC_CHECK_HEADERS([unistr.h],
+		                 [AC_DEFINE([ENABLE_UNISTRING], [], [Support for libunistring.])],
+		                 [AC_MSG_ERROR([Please install libunistring devel package.])])
+		utf8_support="libunistring; full UTF-8 support."
+	],
+	[no], [
+		utf8_support="glib; only modified UTF-8."
+	],
+	[AC_MSG_ERROR([Unknown argument to --enable-unistring])]
+)
+AM_CONDITIONAL([ENABLE_UNISTRING], [test "x$enable_unistring" = xyes])
 
 
 dnl **************************************************************************

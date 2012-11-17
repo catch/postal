@@ -60,4 +60,7 @@ libmongo_glib_la_CPPFLAGS += $(GIO_CFLAGS)
 
 libmongo_glib_la_LIBADD =
 libmongo_glib_la_LIBADD += $(GIO_LIBS)
+
+if ENABLE_UNISTRING
 libmongo_glib_la_LIBADD += -lunistring
+endif
