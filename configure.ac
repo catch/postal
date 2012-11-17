@@ -1,7 +1,7 @@
 dnl **************************************************************************
 dnl Initialize Autoconf and Automake
 dnl **************************************************************************
-AC_PREREQ([2.64])
+AC_PREREQ([2.61])
 AC_INIT([postal], [0.1.0])
 
 AC_CONFIG_HEADERS([config.h])
@@ -9,7 +9,9 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE([-Wno-portability])
 
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES],
+                            [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
+
 AS_AM_REALLY_SILENT
 
 # Check for programs
