@@ -1179,13 +1179,69 @@ postal_service_notify_finish (PostalService  *service,
 }
 
 static void
+postal_service_aps_identity_removed_cb (GObject      *object,
+                                        GAsyncResult *result,
+                                        gpointer      user_data)
+{
+   MongoConnection *connection = (MongoConnection *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_return_if_fail(MONGO_IS_CONNECTION(connection));
+
+   if (!mongo_connection_update_finish(connection, result, &error)) {
+      g_message("Device removal failed: %s\n", error->message);
+      g_error_free(error);
+   }
+
+   EXIT;
+}
+
+static void
 postal_service_aps_identity_removed (PostalService   *service,
                                      PushApsIdentity *identity,
                                      PushApsClient   *client)
 {
+   PostalServicePrivate *priv;
+   MongoBson *q;
+   MongoBson *set;
+   MongoBson *u;
+   GTimeVal tv;
+
    ENTRY;
-   g_message("APS identity removed: %s",
-             push_aps_identity_get_device_token(identity));
+
+   g_assert(POSTAL_IS_SERVICE(service));
+   g_assert(PUSH_IS_APS_IDENTITY(identity));
+
+   priv = service->priv;
+
+   q = mongo_bson_new_empty();
+   mongo_bson_append_string(q, "device_type", "aps");
+   mongo_bson_append_string(q, "device_token",
+                            push_aps_identity_get_device_token(identity));
+   mongo_bson_append_null(q, "removed_at");
+
+   g_get_current_time(&tv);
+   set = mongo_bson_new_empty();
+   mongo_bson_append_timeval(set, "removed_at", &tv);
+
+   u = mongo_bson_new_empty();
+   mongo_bson_append_bson(u, "$set", set);
+
+   mongo_connection_update_async(priv->mongo,
+                                 priv->db_and_collection,
+                                 MONGO_UPDATE_MULTI_UPDATE,
+                                 q,
+                                 u,
+                                 NULL,
+                                 postal_service_aps_identity_removed_cb,
+                                 NULL);
+
+   mongo_bson_unref(q);
+   mongo_bson_unref(set);
+   mongo_bson_unref(u);
+
    EXIT;
 }
 
