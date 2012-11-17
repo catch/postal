@@ -26,7 +26,16 @@ dnl **************************************************************************
 PKG_CHECK_MODULES(GIO,   [gio-2.0 >= 2.32])
 PKG_CHECK_MODULES(SOUP,  [libsoup-2.4 >= 2.26.1])
 PKG_CHECK_MODULES(JSON,  [json-glib-1.0 >= 0.14.0])
-PKG_CHECK_MODULES(MONGO, [mongo-glib-1.0 >= 0.3.5])
+
+
+dnl **************************************************************************
+dnl Check for libunistring
+dnl **************************************************************************
+AC_CHECK_HEADERS([unistr.h], [
+	utf8_support="libunistring; full UTF-8 support."
+], [
+	utf8_support="glib; only modified UTF-8."
+])
 
 
 dnl **************************************************************************
@@ -98,6 +107,7 @@ AC_ARG_ENABLE([trace],
 	      		      [enable_trace=yes])
 AS_CASE([$enable_trace],
 	[yes], [
+		CFLAGS="$CFLAGS -DMONGO_TRACE"
 		CFLAGS="$CFLAGS -DPOSTAL_TRACE"
 		CFLAGS="$CFLAGS -DPUSH_TRACE"
 		CFLAGS="$CFLAGS -DREDIS_TRACE"
@@ -131,4 +141,5 @@ echo "  Prefix .................: ${prefix}"
 echo "  Debug ..................: ${enable_debug}"
 echo "  Tracing ................: ${enable_trace}"
 echo "  Redis ..................: ${enable_redis}"
+echo "  UTF-8 ..................: ${utf8_support}"
 echo ""
