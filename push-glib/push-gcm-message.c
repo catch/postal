@@ -1,6 +1,6 @@
 /* push-gcm-message.c
  *
- * Copyright (C) 2012 Christian Hergert <christian@hergert.me>
+ * Copyright (C) 2012 Catch.com
  *
  * This file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

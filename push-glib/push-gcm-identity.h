@@ -1,6 +1,6 @@
 /* push-gcm-identity.h
  *
- * Copyright (C) 2012 Christian Hergert <chris@dronelabs.com>
+ * Copyright (C) 2012 Catch.com
  *
  * This file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
