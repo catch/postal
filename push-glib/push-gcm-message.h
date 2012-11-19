@@ -20,6 +20,7 @@
 #define PUSH_GCM_MESSAGE_H
 
 #include <glib-object.h>
+#include <json-glib/json-glib.h>
 
 G_BEGIN_DECLS
 
@@ -48,7 +49,23 @@ struct _PushGcmMessageClass
    GObjectClass parent_class;
 };
 
-GType push_gcm_message_get_type (void) G_GNUC_CONST;
+const gchar    *push_gcm_message_get_collapse_key     (PushGcmMessage *message);
+JsonObject     *push_gcm_message_get_data             (PushGcmMessage *message);
+gboolean        push_gcm_message_get_delay_while_idle (PushGcmMessage *message);
+gboolean        push_gcm_message_get_dry_run          (PushGcmMessage *message);
+guint           push_gcm_message_get_time_to_live     (PushGcmMessage *message);
+GType           push_gcm_message_get_type             (void) G_GNUC_CONST;
+PushGcmMessage *push_gcm_message_new                  (void);
+void            push_gcm_message_set_collapse_key     (PushGcmMessage *message,
+                                                       const gchar    *collapse_key);
+void            push_gcm_message_set_data             (PushGcmMessage *message,
+                                                       JsonObject     *data);
+void            push_gcm_message_set_delay_while_idle (PushGcmMessage *message,
+                                                       gboolean        delay_while_idle);
+void            push_gcm_message_set_dry_run          (PushGcmMessage *message,
+                                                       gboolean        dry_run);
+void            push_gcm_message_set_time_to_live     (PushGcmMessage *message,
+                                                       guint           ttl);
 
 G_END_DECLS
 

@@ -16,6 +16,7 @@ libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-c2dm-message.h
 libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-debug.h
 libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-identity.h
 libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-identity.c
+libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-message.c
 libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-gcm-message.h
 libpush_glib_la_SOURCES += $(top_srcdir)/push-glib/push-glib.h
 
