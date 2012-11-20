@@ -1401,6 +1401,73 @@ postal_service_c2dm_identity_removed (PostalService    *service,
    EXIT;
 }
 
+static void
+postal_service_gcm_identity_removed_cb (GObject      *object,
+                                        GAsyncResult *result,
+                                        gpointer      user_data)
+{
+   MongoConnection *connection = (MongoConnection *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_return_if_fail(MONGO_IS_CONNECTION(connection));
+
+   if (!mongo_connection_update_finish(connection, result, &error)) {
+      g_message("Device removal failed: %s\n", error->message);
+      g_error_free(error);
+   }
+
+   EXIT;
+}
+
+static void
+postal_service_gcm_identity_removed (PostalService   *service,
+                                     PushGcmIdentity *identity,
+                                     PushGcmClient   *client)
+{
+   PostalServicePrivate *priv;
+   MongoBson *q;
+   MongoBson *set;
+   MongoBson *u;
+   GTimeVal tv;
+
+   ENTRY;
+
+   g_assert(POSTAL_IS_SERVICE(service));
+   g_assert(PUSH_IS_GCM_IDENTITY(identity));
+
+   priv = service->priv;
+
+   q = mongo_bson_new_empty();
+   mongo_bson_append_string(q, "device_type", "gcm");
+   mongo_bson_append_string(q, "device_token",
+                            push_gcm_identity_get_registration_id(identity));
+   mongo_bson_append_null(q, "removed_at");
+
+   g_get_current_time(&tv);
+   set = mongo_bson_new_empty();
+   mongo_bson_append_timeval(set, "removed_at", &tv);
+
+   u = mongo_bson_new_empty();
+   mongo_bson_append_bson(u, "$set", set);
+
+   mongo_connection_update_async(priv->mongo,
+                                 priv->db_and_collection,
+                                 MONGO_UPDATE_MULTI_UPDATE,
+                                 q,
+                                 u,
+                                 NULL,
+                                 postal_service_gcm_identity_removed_cb,
+                                 NULL);
+
+   mongo_bson_unref(q);
+   mongo_bson_unref(set);
+   mongo_bson_unref(u);
+
+   EXIT;
+}
+
 /**
  * postal_service_set_config:
  * @service: (in): A #PostalService.
@@ -1514,6 +1581,11 @@ postal_service_start (PostalService *service)
    g_signal_connect_swapped(priv->c2dm,
                             "identity-removed",
                             G_CALLBACK(postal_service_c2dm_identity_removed),
+                            service);
+
+   g_signal_connect_swapped(priv->gcm,
+                            "identity-removed",
+                            G_CALLBACK(postal_service_gcm_identity_removed),
                             service);
 
    g_free(ssl_cert_file);
