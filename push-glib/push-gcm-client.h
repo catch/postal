@@ -51,8 +51,17 @@ struct _PushGcmClientClass
    SoupSessionAsyncClass parent_class;
 };
 
-GType          push_gcm_client_get_type (void) G_GNUC_CONST;
-PushGcmClient *push_gcm_client_new      (const gchar *auth_token);
+GType          push_gcm_client_get_type      (void) G_GNUC_CONST;
+PushGcmClient *push_gcm_client_new           (const gchar          *auth_token);
+void           push_gcm_client_deliver_async (PushGcmClient        *client,
+                                              GList                *identities,
+                                              PushGcmMessage       *message,
+                                              GCancellable         *cancellable,
+                                              GAsyncReadyCallback   callback,
+                                              gpointer              user_data);
+gboolean       push_gcm_client_deliver_finish (PushGcmClient       *client,
+                                               GAsyncResult        *result,
+                                               GError             **error);
 
 G_END_DECLS
 

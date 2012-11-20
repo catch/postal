@@ -21,6 +21,26 @@
 #include "push-debug.h"
 #include "push-gcm-client.h"
 
+#define PUSH_GCM_CLIENT_URL "https://android.googleapis.com/gcm/send"
+
+/**
+ * SECTION:push-gcm-client
+ * @title: PushGcmClient
+ * @short_description: Client to send notifications to GCM (Android) devices.
+ *
+ * #PushGcmClient provides a convenient way to send notifications to one or
+ * more Android devices via Google's GCM service. Simply create an instance
+ * of the client and start delivering messages using
+ * push_gcm_client_deliver_async(). The notification will be delivered
+ * asynchronously and the caller will be notified via the specified callback
+ * upon delivery of the message to GCM.
+ *
+ * If it has been determined that a device has been removed, the
+ * :identity-removed single will be emitted. It is important that consumers
+ * connect to this signal and remove the device from their database to
+ * prevent further communication with the service.
+ */
+
 G_DEFINE_TYPE(PushGcmClient, push_gcm_client, SOUP_TYPE_SESSION_ASYNC)
 
 struct _PushGcmClientPrivate
@@ -60,6 +80,165 @@ push_gcm_client_set_auth_token (PushGcmClient *client,
    g_free(client->priv->auth_token);
    client->priv->auth_token = g_strdup(auth_token);
    g_object_notify_by_pspec(G_OBJECT(client), gParamSpecs[PROP_AUTH_TOKEN]);
+}
+
+static void
+push_gcm_client_deliver_cb (SoupSession *session,
+                            SoupMessage *message,
+                            gpointer     user_data)
+{
+   GSimpleAsyncResult *simple = user_data;
+
+   ENTRY;
+
+   g_assert(SOUP_IS_SESSION(session));
+   g_assert(SOUP_IS_MESSAGE(message));
+
+   g_print("RESPONSE: \"%s\"\n", message->response_body->data);
+
+   /*
+    * TODO: Parse the result.
+    */
+   g_simple_async_result_set_op_res_gboolean(simple, TRUE);
+
+   g_simple_async_result_complete_in_idle(simple);
+   g_object_unref(simple);
+
+   EXIT;
+}
+
+/**
+ * push_gcm_client_deliver_async:
+ * @client: (in): A #PushGcmClient.
+ * @identities: (element-type PushGcmIdentity*): A #GList of #PushGcmIdentity.
+ * @message: A #PushGcmMessage.
+ * @cancellable: (allow-none): A #GCancellable or %NULL.
+ * @callback: A #GAsyncReadyCallback.
+ * @user_data: User data for @callback.
+ *
+ * Asynchronously deliver a #PushGcmMessage to one or more GCM enabled
+ * devices.
+ */
+void
+push_gcm_client_deliver_async (PushGcmClient       *client,
+                               GList               *identities,
+                               PushGcmMessage      *message,
+                               GCancellable        *cancellable,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+   PushGcmClientPrivate *priv;
+   GSimpleAsyncResult *simple;
+   SoupMessage *request;
+   const gchar *registration_id;
+   const gchar *collapse_key;
+   JsonGenerator *g;
+   JsonObject *obj;
+   JsonObject *data;
+   JsonObject *mdata;
+   JsonArray *ar;
+   JsonNode *node;
+   GList *iter;
+   gchar *str;
+   gsize length;
+   guint time_to_live;
+
+   ENTRY;
+
+   g_return_if_fail(PUSH_IS_GCM_CLIENT(client));
+   g_return_if_fail(identities);
+   g_return_if_fail(PUSH_IS_GCM_MESSAGE(message));
+   g_return_if_fail(!cancellable || G_IS_CANCELLABLE(cancellable));
+   g_return_if_fail(callback);
+
+   priv = client->priv;
+
+   request = soup_message_new("POST", PUSH_GCM_CLIENT_URL);
+   ar = json_array_new();
+
+   for (iter = identities; iter; iter = iter->next) {
+      g_assert(PUSH_IS_GCM_IDENTITY(iter->data));
+      registration_id = push_gcm_identity_get_registration_id(iter->data);
+      json_array_add_string_element(ar, registration_id);
+   }
+
+   str = g_strdup_printf("key=%s", priv->auth_token);
+   soup_message_headers_append(request->request_headers, "Authorization", str);
+   g_free(str);
+
+   data = json_object_new();
+
+   if ((collapse_key = push_gcm_message_get_collapse_key(message))) {
+      json_object_set_string_member(data, "collapse_key", collapse_key);
+   }
+
+   json_object_set_boolean_member(data,
+                                  "delay_while_idle",
+                                  push_gcm_message_get_delay_while_idle(message));
+
+   json_object_set_boolean_member(data,
+                                  "dry_run",
+                                  push_gcm_message_get_dry_run(message));
+
+   if ((time_to_live = push_gcm_message_get_time_to_live(message))) {
+      json_object_set_int_member(data, "time_to_live", time_to_live);
+   }
+
+   if ((mdata = push_gcm_message_get_data(message))) {
+      json_object_set_object_member(data, "data", mdata);
+   }
+
+   obj = json_object_new();
+   json_object_set_array_member(obj, "registration_ids", ar);
+   json_object_set_object_member(obj, "data", data);
+
+   node = json_node_new(JSON_NODE_OBJECT);
+   json_node_set_object(node, obj);
+   json_object_unref(obj);
+
+   g = json_generator_new();
+   json_generator_set_pretty(g, TRUE);
+   json_generator_set_indent(g, 2);
+   json_generator_set_root(g, node);
+   str = json_generator_to_data(g, &length);
+   json_node_free(node);
+   g_object_unref(g);
+
+   g_print("REQUEST: \"%s\"\n", str);
+
+   soup_message_set_request(request,
+                            "application/json",
+                            SOUP_MEMORY_TAKE,
+                            str,
+                            length);
+
+   simple = g_simple_async_result_new(G_OBJECT(client), callback, user_data,
+                                      push_gcm_client_deliver_async);
+
+   soup_session_queue_message(SOUP_SESSION(client),
+                              request,
+                              push_gcm_client_deliver_cb,
+                              simple);
+
+   EXIT;
+}
+
+gboolean
+push_gcm_client_deliver_finish (PushGcmClient  *client,
+                                GAsyncResult   *result,
+                                GError        **error)
+{
+   GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
+   gboolean ret;
+
+   g_return_val_if_fail(PUSH_IS_GCM_CLIENT(client), FALSE);
+   g_return_val_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple), FALSE);
+
+   if (!(ret = g_simple_async_result_get_op_res_gboolean(simple))) {
+      g_simple_async_result_propagate_error(simple, error);
+   }
+
+   return ret;
 }
 
 static void

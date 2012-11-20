@@ -31,6 +31,9 @@ G_BEGIN_DECLS
 #include "push-c2dm-client.h"
 #include "push-c2dm-identity.h"
 #include "push-c2dm-message.h"
+#include "push-gcm-client.h"
+#include "push-gcm-identity.h"
+#include "push-gcm-message.h"
 
 #undef PUSH_INSIDE
 
