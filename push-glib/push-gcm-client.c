@@ -55,7 +55,14 @@ enum
    LAST_PROP
 };
 
+enum
+{
+   IDENTITY_REMOVED,
+   LAST_SIGNAL
+};
+
 static GParamSpec *gParamSpecs[LAST_PROP];
+static guint       gSignals[IDENTITY_REMOVED];
 
 PushGcmClient *
 push_gcm_client_new (const gchar *auth_token)
@@ -307,6 +314,17 @@ push_gcm_client_class_init (PushGcmClientClass *klass)
                           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
    g_object_class_install_property(object_class, PROP_AUTH_TOKEN,
                                    gParamSpecs[PROP_AUTH_TOKEN]);
+
+   gSignals[IDENTITY_REMOVED] = g_signal_new("identity-removed",
+                                             PUSH_TYPE_GCM_CLIENT,
+                                             G_SIGNAL_RUN_FIRST,
+                                             0,
+                                             NULL,
+                                             NULL,
+                                             g_cclosure_marshal_VOID__OBJECT,
+                                             G_TYPE_NONE,
+                                             1,
+                                             PUSH_TYPE_GCM_IDENTITY);
 }
 
 static void
