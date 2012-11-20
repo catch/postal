@@ -394,5 +394,5 @@ push_c2dm_client_init (PushC2dmClient *client)
 GQuark
 push_c2dm_client_error_quark (void)
 {
-   return g_quark_from_static_string("psuh-c2dm-client-error-quark");
+   return g_quark_from_static_string("PushC2dmClientError");
 }
