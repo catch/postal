@@ -50,6 +50,14 @@ enum
 
 static GParamSpec *gParamSpecs[LAST_PROP];
 
+PushGcmIdentity *
+push_gcm_identity_new (const gchar *registration_id)
+{
+   return g_object_new(PUSH_TYPE_GCM_IDENTITY,
+                       "registration-id", registration_id,
+                       NULL);
+}
+
 const gchar *
 push_gcm_identity_get_registration_id (PushGcmIdentity *identity)
 {
