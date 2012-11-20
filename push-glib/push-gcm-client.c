@@ -90,26 +90,90 @@ push_gcm_client_set_auth_token (PushGcmClient *client,
 }
 
 static void
+_push_gcm_identities_free (gpointer data)
+{
+   g_list_foreach(data, (GFunc)g_object_unref, NULL);
+   g_list_free(data);
+}
+
+static void
 push_gcm_client_deliver_cb (SoupSession *session,
                             SoupMessage *message,
                             gpointer     user_data)
 {
    GSimpleAsyncResult *simple = user_data;
+   const gchar *str;
+   JsonObject *obj;
+   JsonParser *p;
+   JsonArray *ar;
+   JsonNode *root;
+   JsonNode *node;
+   gboolean removed;
+   GError *error = NULL;
+   GList *list;
+   gsize length;
+   guint i;
 
    ENTRY;
 
    g_assert(SOUP_IS_SESSION(session));
    g_assert(SOUP_IS_MESSAGE(message));
+   g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
    g_print("RESPONSE: \"%s\"\n", message->response_body->data);
 
-   /*
-    * TODO: Parse the result.
-    */
+   p = json_parser_new();
+
+   if (!json_parser_load_from_data(p,
+                                   message->response_body->data,
+                                   message->response_body->length,
+                                   &error)) {
+      g_simple_async_result_take_error(simple, error);
+      GOTO(failure);
+   }
+
+   list = g_object_get_data(G_OBJECT(simple), "identities");
+
+   if ((root = json_parser_get_root(p)) &&
+       JSON_NODE_HOLDS_OBJECT(root) &&
+       (obj = json_node_get_object(root)) &&
+       json_object_has_member(obj, "results") &&
+       (node = json_object_get_member(obj, "results")) &&
+       JSON_NODE_HOLDS_ARRAY(node) &&
+       (ar = json_node_get_array(node))) {
+      length = json_array_get_length(ar);
+      for (i = 0; i < length && list; i++, list = list->next) {
+         removed = FALSE;
+         if ((obj = json_array_get_object_element(ar, i)) &&
+             json_object_has_member(obj, "error") &&
+             (node = json_object_get_member(obj, "error")) &&
+             JSON_NODE_HOLDS_VALUE(node) &&
+             (str = json_node_get_string(node))) {
+            if (!g_strcmp0(str, "MissingRegistration")) {
+               removed = TRUE;
+            } else if (!g_strcmp0(str, "InvalidRegistration")) {
+               removed = TRUE;
+            } else if (!g_strcmp0(str, "MismatchSenderId")) {
+            } else if (!g_strcmp0(str, "NotRegistered")) {
+               removed = TRUE;
+            } else if (!g_strcmp0(str, "MessageTooBig")) {
+            } else if (!g_strcmp0(str, "InvalidDataKey")) {
+            } else if (!g_strcmp0(str, "InvalidTtl")) {
+            }
+
+            if (removed) {
+               g_signal_emit(session, gSignals[IDENTITY_REMOVED], 0, list->data);
+            }
+         }
+      }
+   }
+
    g_simple_async_result_set_op_res_gboolean(simple, TRUE);
 
+failure:
    g_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
+   g_object_unref(p);
 
    EXIT;
 }
@@ -146,6 +210,7 @@ push_gcm_client_deliver_async (PushGcmClient       *client,
    JsonArray *ar;
    JsonNode *node;
    GList *iter;
+   GList *list;
    gchar *str;
    gsize length;
    guint time_to_live;
@@ -221,6 +286,17 @@ push_gcm_client_deliver_async (PushGcmClient       *client,
 
    simple = g_simple_async_result_new(G_OBJECT(client), callback, user_data,
                                       push_gcm_client_deliver_async);
+
+   /*
+    * Keep the list of identities around until we receive our result.
+    * We need them to key with the resulting array.
+    */
+   list = g_list_copy(identities);
+   g_list_foreach(list, (GFunc)g_object_ref, NULL);
+   g_object_set_data_full(G_OBJECT(simple),
+                          "identities",
+                          list,
+                          _push_gcm_identities_free);
 
    soup_session_queue_message(SOUP_SESSION(client),
                               request,
