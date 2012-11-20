@@ -67,9 +67,13 @@ static guint       gSignals[IDENTITY_REMOVED];
 PushGcmClient *
 push_gcm_client_new (const gchar *auth_token)
 {
-   return g_object_new(PUSH_TYPE_GCM_CLIENT,
-                       "auth-token", auth_token,
-                       NULL);
+   PushGcmClient *client;
+
+   ENTRY;
+   client = g_object_new(PUSH_TYPE_GCM_CLIENT,
+                         "auth-token", auth_token,
+                         NULL);
+   RETURN(client);
 }
 
 const gchar *
@@ -83,17 +87,21 @@ void
 push_gcm_client_set_auth_token (PushGcmClient *client,
                                 const gchar   *auth_token)
 {
+   ENTRY;
    g_return_if_fail(PUSH_IS_GCM_CLIENT(client));
    g_free(client->priv->auth_token);
    client->priv->auth_token = g_strdup(auth_token);
    g_object_notify_by_pspec(G_OBJECT(client), gParamSpecs[PROP_AUTH_TOKEN]);
+   EXIT;
 }
 
 static void
 _push_gcm_identities_free (gpointer data)
 {
+   ENTRY;
    g_list_foreach(data, (GFunc)g_object_unref, NULL);
    g_list_free(data);
+   EXIT;
 }
 
 static void
@@ -315,6 +323,8 @@ push_gcm_client_deliver_finish (PushGcmClient  *client,
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
    gboolean ret;
 
+   ENTRY;
+
    g_return_val_if_fail(PUSH_IS_GCM_CLIENT(client), FALSE);
    g_return_val_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple), FALSE);
 
@@ -322,7 +332,7 @@ push_gcm_client_deliver_finish (PushGcmClient  *client,
       g_simple_async_result_propagate_error(simple, error);
    }
 
-   return ret;
+   RETURN(ret);
 }
 
 static void
@@ -376,6 +386,8 @@ push_gcm_client_class_init (PushGcmClientClass *klass)
 {
    GObjectClass *object_class;
 
+   ENTRY;
+
    object_class = G_OBJECT_CLASS(klass);
    object_class->finalize = push_gcm_client_finalize;
    object_class->get_property = push_gcm_client_get_property;
@@ -402,13 +414,17 @@ push_gcm_client_class_init (PushGcmClientClass *klass)
                                              G_TYPE_NONE,
                                              1,
                                              PUSH_TYPE_GCM_IDENTITY);
+
+   EXIT;
 }
 
 static void
 push_gcm_client_init (PushGcmClient *client)
 {
+   ENTRY;
    client->priv =
       G_TYPE_INSTANCE_GET_PRIVATE(client,
                                   PUSH_TYPE_GCM_CLIENT,
                                   PushGcmClientPrivate);
+   EXIT;
 }
