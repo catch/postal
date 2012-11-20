@@ -1136,6 +1136,7 @@ postal_service_notify_cb (GObject      *object,
 
    g_object_unref(aps_message);
    g_object_unref(c2dm_message);
+   g_object_unref(gcm_message);
 
    g_simple_async_result_set_op_res_gboolean(simple, TRUE);
 
