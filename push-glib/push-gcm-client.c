@@ -162,6 +162,7 @@ push_gcm_client_deliver_cb (SoupSession *session,
             }
 
             if (removed) {
+               g_assert(PUSH_IS_GCM_IDENTITY(list->data));
                g_signal_emit(session, gSignals[IDENTITY_REMOVED], 0, list->data);
             }
          }

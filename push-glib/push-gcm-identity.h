@@ -48,11 +48,10 @@ struct _PushGcmIdentityClass
    GObjectClass parent_class;
 };
 
-const gchar     *push_gcm_identity_get_registration_id (PushGcmIdentity *identity);
-GType            push_gcm_identity_get_type            (void) G_GNUC_CONST;
-void             push_gcm_identity_set_registration_id (PushGcmIdentity *identity,
-                                                        const gchar     *registration_id);
-PushGcmIdentity *push_gcm_identity_new                 (const gchar     *registration_id);
+GType        push_gcm_identity_get_type            (void) G_GNUC_CONST;
+const gchar *push_gcm_identity_get_registration_id (PushGcmIdentity *identity);
+void         push_gcm_identity_set_registration_id (PushGcmIdentity *identity,
+                                                    const gchar     *registration_id);
 
 G_END_DECLS
 
