@@ -1036,7 +1036,6 @@ postal_service_notify_cb (GObject      *object,
    MongoMessageReply *reply;
    PushC2dmIdentity *c2dm;
    PushC2dmMessage *c2dm_message;
-   PushGcmIdentity *gcm;
    PushGcmMessage *gcm_message;
    MongoConnection *connection = (MongoConnection *)object;
    PushApsIdentity *aps;
@@ -1090,19 +1089,16 @@ postal_service_notify_cb (GObject      *object,
          device_type = mongo_bson_iter_get_value_string(&iter, NULL);
          if (!g_strcmp0(device_type, "gcm")) {
             if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-               gcm = g_object_new(PUSH_TYPE_GCM_IDENTITY,
-                                  "registration-id", device_token,
-                                  NULL);
                memset(&item, 0, sizeof item);
-               item.data = gcm;
+               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
+               item.data = push_gcm_identity_new(device_token);
                push_gcm_client_deliver_async(priv->gcm,
                                              &item,
                                              gcm_message,
                                              NULL, /* TODO: */
                                              postal_service_notify_gcm_cb,
                                              NULL);
-               g_object_unref(gcm);
+               g_object_unref(item.data);
             }
          } else if (!g_strcmp0(device_type, "c2dm")) {
             if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
