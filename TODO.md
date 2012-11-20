@@ -2,6 +2,8 @@
 
  * Delay of notification delivery.
  * Add /status HTTP page.
+ * Use cursors for handling mongo replies as it doesnt always return same
+   number of results.
 
 # Things that would be nice.
 
