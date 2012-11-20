@@ -35,6 +35,7 @@ struct _PostalServicePrivate
 {
    PushApsClient   *aps;
    PushC2dmClient  *c2dm;
+   PushGcmClient   *gcm;
    GKeyFile        *config;
    gchar           *db_and_collection;
    MongoConnection *mongo;
@@ -896,6 +897,55 @@ postal_service_build_c2dm (PostalNotification *notification)
    RETURN(message);
 }
 
+static PushGcmMessage *
+postal_service_build_gcm (PostalNotification *notification)
+{
+   PushGcmMessage *message;
+   const gchar *collapse_key;
+   JsonObject *obj;
+   JsonNode *node;
+   GList *list;
+   GList *iter;
+
+   ENTRY;
+
+   g_return_val_if_fail(POSTAL_IS_NOTIFICATION(notification), NULL);
+
+   collapse_key = postal_notification_get_collapse_key(notification);
+   message = g_object_new(PUSH_TYPE_GCM_MESSAGE,
+                          "collapse-key", collapse_key,
+                          NULL);
+
+   if ((obj = postal_notification_get_gcm(notification))) {
+      list = json_object_get_members(obj);
+      for (iter = list; iter; iter = iter->next) {
+         node = json_object_get_member(obj, iter->data);
+
+         if (!g_strcmp0(iter->data, "data") && JSON_NODE_HOLDS_OBJECT(node)) {
+            push_gcm_message_set_data(message, json_node_get_object(node));
+         } else if (!g_strcmp0(iter->data, "delay_while_idle")) {
+            if (json_node_get_value_type(node) == G_TYPE_BOOLEAN) {
+               push_gcm_message_set_delay_while_idle(
+                     message, json_node_get_boolean(node));
+            }
+         } else if (!g_strcmp0(iter->data, "dry_run")) {
+            if (json_node_get_value_type(node) == G_TYPE_BOOLEAN) {
+               push_gcm_message_set_dry_run(message,
+                                            json_node_get_boolean(node));
+            }
+         } else if (!g_strcmp0(iter->data, "time_to_live")) {
+            if (json_node_get_value_type(node) == G_TYPE_INT64) {
+               push_gcm_message_set_time_to_live(message,
+                                                 json_node_get_int(node));
+            }
+         }
+      }
+      g_list_free(list);
+   }
+
+   RETURN(message);
+}
+
 static PushApsMessage *
 postal_service_build_aps (PostalNotification *notification)
 {
@@ -936,6 +986,26 @@ postal_service_notify_c2dm_cb (GObject      *object,
 }
 
 static void
+postal_service_notify_gcm_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
+{
+   PushGcmClient *client = (PushGcmClient *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_assert(PUSH_IS_GCM_CLIENT(client));
+
+   if (!push_gcm_client_deliver_finish(client, result, &error)) {
+      g_message("%s", error->message);
+      g_error_free(error);
+   }
+
+   EXIT;
+}
+
+static void
 postal_service_notify_aps_cb (GObject      *object,
                               GAsyncResult *result,
                               gpointer      user_data)
@@ -966,6 +1036,8 @@ postal_service_notify_cb (GObject      *object,
    MongoMessageReply *reply;
    PushC2dmIdentity *c2dm;
    PushC2dmMessage *c2dm_message;
+   PushGcmIdentity *gcm;
+   PushGcmMessage *gcm_message;
    MongoConnection *connection = (MongoConnection *)object;
    PushApsIdentity *aps;
    PushApsMessage *aps_message;
@@ -974,6 +1046,7 @@ postal_service_notify_cb (GObject      *object,
    const gchar *device_token;
    GError *error = NULL;
    GList *list;
+   GList item;
 
    ENTRY;
 
@@ -990,6 +1063,7 @@ postal_service_notify_cb (GObject      *object,
    notif = g_object_get_data(G_OBJECT(simple), "notification");
    aps_message = postal_service_build_aps(notif);
    c2dm_message = postal_service_build_c2dm(notif);
+   gcm_message = postal_service_build_gcm(notif);
 
    /*
     * TODO: Right now, this is just sending a message to all of these users.
@@ -1015,11 +1089,21 @@ postal_service_notify_cb (GObject      *object,
       if (mongo_bson_iter_init_find(&iter, list->data, "device_type")) {
          device_type = mongo_bson_iter_get_value_string(&iter, NULL);
          if (!g_strcmp0(device_type, "gcm")) {
-#if 0
-            g_object_new(PUSH_TYPE_GCM_IDENTITY,
-                         "registration-id", registration_id,
-                         NULL);
-#endif
+            if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
+               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
+               gcm = g_object_new(PUSH_TYPE_GCM_IDENTITY,
+                                  "registration-id", device_token,
+                                  NULL);
+               memset(&item, 0, sizeof item);
+               item.data = gcm;
+               push_gcm_client_deliver_async(priv->gcm,
+                                             &item,
+                                             gcm_message,
+                                             NULL, /* TODO: */
+                                             postal_service_notify_gcm_cb,
+                                             NULL);
+               g_object_unref(gcm);
+            }
          } else if (!g_strcmp0(device_type, "c2dm")) {
             if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
                device_token = mongo_bson_iter_get_value_string(&iter, NULL);
@@ -1361,6 +1445,7 @@ postal_service_start (PostalService *service)
    PostalServicePrivate *priv;
    PushApsClientMode aps_mode;
    gchar *c2dm_auth_token = NULL;
+   gchar *gcm_auth_token = NULL;
    gchar *collection = NULL;
    gchar *db = NULL;
    gchar *ssl_cert_file = NULL;
@@ -1379,6 +1464,7 @@ postal_service_start (PostalService *service)
     */
    aps_mode = PUSH_APS_CLIENT_PRODUCTION;
    c2dm_auth_token = NULL;
+   gcm_auth_token = NULL;
    ssl_cert_file = NULL;
    ssl_key_file = NULL;
    feedback_interval_sec = 10;
@@ -1395,6 +1481,7 @@ postal_service_start (PostalService *service)
       ssl_cert_file = GET_STRING_KEY("aps", "ssl-cert-file");
       ssl_key_file = GET_STRING_KEY("aps", "ssl-key-file");
       c2dm_auth_token = GET_STRING_KEY("c2dm", "auth-token");
+      gcm_auth_token = GET_STRING_KEY("gcm", "auth-token");
       collection = GET_STRING_KEY("mongo", "collection");
       db = GET_STRING_KEY("mongo", "db");
       uri = GET_STRING_KEY("mongo", "uri");
@@ -1413,6 +1500,9 @@ postal_service_start (PostalService *service)
    priv->c2dm = g_object_new(PUSH_TYPE_C2DM_CLIENT,
                              "auth-token", c2dm_auth_token,
                              NULL);
+   priv->gcm = g_object_new(PUSH_TYPE_GCM_CLIENT,
+                            "auth-token", gcm_auth_token,
+                            NULL);
    priv->mongo = mongo_connection_new_from_uri(uri);
 
 
@@ -1429,6 +1519,7 @@ postal_service_start (PostalService *service)
    g_free(ssl_cert_file);
    g_free(ssl_key_file);
    g_free(c2dm_auth_token);
+   g_free(gcm_auth_token);
    g_free(collection);
    g_free(db);
    g_free(uri);
