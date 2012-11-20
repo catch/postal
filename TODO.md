@@ -1,6 +1,5 @@
 # Things we need immediately.
 
- * Notification delivery.
  * Delay of notification delivery.
  * Add /status HTTP page.
 
@@ -14,4 +13,5 @@
  * General code cleanup.
  * Documentation.
  * Code comments.
+ * Exponential back-off to GCM, C2DM, and APS services.
 
