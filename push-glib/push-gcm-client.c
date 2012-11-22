@@ -62,7 +62,7 @@ enum
 };
 
 static GParamSpec *gParamSpecs[LAST_PROP];
-static guint       gSignals[IDENTITY_REMOVED];
+static guint       gSignals[LAST_SIGNAL];
 
 PushGcmClient *
 push_gcm_client_new (const gchar *auth_token)
