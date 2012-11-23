@@ -112,7 +112,7 @@ push_gcm_client_deliver_cb (SoupSession *session,
    GSimpleAsyncResult *simple = user_data;
    const gchar *str;
    JsonObject *obj;
-   JsonParser *p;
+   JsonParser *p = NULL;
    JsonArray *ar;
    JsonNode *root;
    JsonNode *node;
@@ -129,6 +129,14 @@ push_gcm_client_deliver_cb (SoupSession *session,
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
    g_print("RESPONSE: \"%s\"\n", message->response_body->data);
+
+   if (!message->response_body->data || !message->response_body->length) {
+      g_simple_async_result_set_error(simple,
+                                      SOUP_HTTP_ERROR,
+                                      SOUP_STATUS_IO_ERROR,
+                                      _("No data was received from GCM."));
+      GOTO(failure);
+   }
 
    p = json_parser_new();
 
@@ -182,7 +190,9 @@ push_gcm_client_deliver_cb (SoupSession *session,
 failure:
    g_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
-   g_object_unref(p);
+   if (p) {
+      g_object_unref(p);
+   }
 
    EXIT;
 }
