@@ -1044,8 +1044,8 @@ postal_service_notify_cb (GObject      *object,
    const gchar *device_type;
    const gchar *device_token;
    GError *error = NULL;
+   GList *gcm_devices = NULL;
    GList *list;
-   GList item;
 
    ENTRY;
 
@@ -1078,27 +1078,15 @@ postal_service_notify_cb (GObject      *object,
     *       seconds or so. (Then evict that message).
     */
 
-   /*
-    * TODO: We need to inflate all of the GCM identities together so that
-    *       we can send them a message via a single API call to Google.
-    */
-
    list = mongo_message_reply_get_documents(reply);
    for (; list; list = list->next) {
       if (mongo_bson_iter_init_find(&iter, list->data, "device_type")) {
          device_type = mongo_bson_iter_get_value_string(&iter, NULL);
          if (!g_strcmp0(device_type, "gcm")) {
             if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-               memset(&item, 0, sizeof item);
                device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-               item.data = push_gcm_identity_new(device_token);
-               push_gcm_client_deliver_async(priv->gcm,
-                                             &item,
-                                             gcm_message,
-                                             NULL, /* TODO: */
-                                             postal_service_notify_gcm_cb,
-                                             NULL);
-               g_object_unref(item.data);
+               gcm_devices = g_list_append(gcm_devices,
+                                           push_gcm_identity_new(device_token));
             }
          } else if (!g_strcmp0(device_type, "c2dm")) {
             if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
@@ -1132,6 +1120,17 @@ postal_service_notify_cb (GObject      *object,
             g_warning("Unknown device_type %s", device_type);
          }
       }
+   }
+
+   if (gcm_devices) {
+         push_gcm_client_deliver_async(priv->gcm,
+                                       gcm_devices,
+                                       gcm_message,
+                                       NULL, /* TODO: */
+                                       postal_service_notify_gcm_cb,
+                                       NULL);
+         g_list_foreach(gcm_devices, (GFunc)g_object_unref, NULL);
+         g_list_free(gcm_devices);
    }
 
    g_object_unref(aps_message);
