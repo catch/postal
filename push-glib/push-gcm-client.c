@@ -257,6 +257,10 @@ push_gcm_client_deliver_async (PushGcmClient       *client,
    soup_message_headers_append(request->request_headers, "Authorization", str);
    g_free(str);
 
+   soup_message_headers_append(request->request_headers,
+                               "Accept",
+                               "application/json");
+
    data = json_object_new();
 
    if ((collapse_key = push_gcm_message_get_collapse_key(message))) {
