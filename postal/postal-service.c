@@ -38,6 +38,8 @@ struct _PostalServicePrivate
    PushGcmClient   *gcm;
    GKeyFile        *config;
    gchar           *db_and_collection;
+   gchar           *db;
+   gchar           *collection;
    MongoConnection *mongo;
 };
 
@@ -412,28 +414,44 @@ postal_service_find_devices_cb (GObject      *object,
                                 gpointer      user_data)
 {
    GSimpleAsyncResult *simple = user_data;
-   MongoMessageReply *reply;
-   MongoConnection *connection = (MongoConnection *)object;
+   MongoCursor *cursor = (MongoCursor *)object;
    GError *error = NULL;
 
    ENTRY;
 
-   g_assert(MONGO_IS_CONNECTION(connection));
+   g_assert(MONGO_IS_CURSOR(cursor));
    g_assert(G_IS_ASYNC_RESULT(result));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   if (!(reply = mongo_connection_query_finish(connection, result, &error))) {
+   if (!mongo_cursor_foreach_finish(cursor, result, &error)) {
+      g_simple_async_result_set_op_res_gpointer(simple, NULL, NULL);
       g_simple_async_result_take_error(simple, error);
       GOTO(cleanup);
    }
-
-   g_simple_async_result_set_op_res_gpointer(simple, reply, g_object_unref);
 
 cleanup:
    g_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
 
    EXIT;
+}
+
+static gboolean
+postal_service_find_devices_foreach (MongoCursor *cursor,
+                                     MongoBson   *bson,
+                                     gpointer     user_data)
+{
+   GPtrArray *devices = user_data;
+
+   ENTRY;
+
+   g_return_val_if_fail(MONGO_IS_CURSOR(cursor), TRUE);
+   g_return_val_if_fail(bson, TRUE);
+   g_return_val_if_fail(devices, TRUE);
+
+   g_ptr_array_add(devices, mongo_bson_ref(bson));
+
+   RETURN(TRUE);
 }
 
 /**
@@ -463,6 +481,8 @@ postal_service_find_devices (PostalService       *service,
    PostalServicePrivate *priv;
    GSimpleAsyncResult *simple;
    MongoObjectId *id;
+   MongoCursor *cursor;
+   GPtrArray *devices;
    MongoBson *q;
 
    ENTRY;
@@ -483,21 +503,33 @@ postal_service_find_devices (PostalService       *service,
       mongo_bson_append_string(q, "user", user);
    }
 
+   cursor = g_object_new(MONGO_TYPE_CURSOR,
+                         "database", priv->db,
+                         "collection", priv->collection,
+                         "connection", priv->mongo,
+                         "limit", (guint)limit,
+                         "query", q,
+                         "skip", (guint)offset,
+                         NULL);
+
    simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
                                       postal_service_find_devices);
    g_simple_async_result_set_check_cancellable(simple, cancellable);
-   mongo_connection_query_async(priv->mongo,
-                                priv->db_and_collection,
-                                MONGO_QUERY_NONE,
-                                offset,
-                                limit,
-                                q,
-                                NULL,
-                                cancellable,
-                                postal_service_find_devices_cb,
-                                simple);
+
+   devices = g_ptr_array_new_with_free_func((GDestroyNotify)mongo_bson_unref);
+   g_simple_async_result_set_op_res_gpointer(simple, devices,
+                                             (GDestroyNotify)g_ptr_array_unref);
+
+   mongo_cursor_foreach_async(cursor,
+                              postal_service_find_devices_foreach,
+                              g_ptr_array_ref(devices),
+                              (GDestroyNotify)g_ptr_array_unref,
+                              cancellable,
+                              postal_service_find_devices_cb,
+                              simple);
 
    mongo_bson_unref(q);
+   g_object_unref(cursor);
 
    EXIT;
 }
@@ -527,22 +559,26 @@ postal_service_find_devices_finish (PostalService  *service,
                                     GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
-   MongoMessageReply *reply;
-   GList *list;
+   GPtrArray *devices;
+   GList *list = NULL;
+   guint i;
 
    ENTRY;
 
    g_return_val_if_fail(POSTAL_IS_SERVICE(service), NULL);
    g_return_val_if_fail(!error || !*error, NULL);
 
-   if (!(reply = g_simple_async_result_get_op_res_gpointer(simple))) {
+   if (!(devices = g_simple_async_result_get_op_res_gpointer(simple))) {
       g_simple_async_result_propagate_error(simple, error);
       RETURN(NULL);
    }
 
-   list = mongo_message_reply_get_documents(reply);
-   list = g_list_copy(list);
-   g_list_foreach(list, (GFunc)mongo_bson_ref, NULL);
+   for (i = 0; i < devices->len; i++) {
+      list = g_list_prepend(list,
+                            mongo_bson_ref(g_ptr_array_index(devices, i)));
+   }
+
+   list = g_list_reverse(list);
 
    RETURN(list);
 }
@@ -1509,8 +1545,6 @@ postal_service_start (PostalService *service)
    PushApsClientMode aps_mode;
    gchar *c2dm_auth_token = NULL;
    gchar *gcm_auth_token = NULL;
-   gchar *collection = NULL;
-   gchar *db = NULL;
    gchar *ssl_cert_file = NULL;
    gchar *ssl_key_file = NULL;
    gchar *uri = NULL;
@@ -1545,12 +1579,18 @@ postal_service_start (PostalService *service)
       ssl_key_file = GET_STRING_KEY("aps", "ssl-key-file");
       c2dm_auth_token = GET_STRING_KEY("c2dm", "auth-token");
       gcm_auth_token = GET_STRING_KEY("gcm", "auth-token");
-      collection = GET_STRING_KEY("mongo", "collection");
-      db = GET_STRING_KEY("mongo", "db");
       uri = GET_STRING_KEY("mongo", "uri");
 
+      g_free(priv->collection);
+      priv->collection = GET_STRING_KEY("mongo", "collection");
+
+      g_free(priv->db);
+      priv->db = GET_STRING_KEY("mongo", "db");
+
       g_free(priv->db_and_collection);
-      priv->db_and_collection = g_strdup_printf("%s.%s", db, collection);
+      priv->db_and_collection = g_strdup_printf("%s.%s",
+                                                priv->db,
+                                                priv->collection);
    }
 #undef GET_STRING_KEY
 
@@ -1588,8 +1628,6 @@ postal_service_start (PostalService *service)
    g_free(ssl_key_file);
    g_free(c2dm_auth_token);
    g_free(gcm_auth_token);
-   g_free(collection);
-   g_free(db);
    g_free(uri);
 
    EXIT;
@@ -1686,6 +1724,8 @@ postal_service_init (PostalService *service)
                                                POSTAL_TYPE_SERVICE,
                                                PostalServicePrivate);
    service->priv->db_and_collection = g_strdup("test.devices");
+   service->priv->db = g_strdup("test");
+   service->priv->collection = g_strdup("devices");
 
    EXIT;
 }
