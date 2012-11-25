@@ -186,6 +186,9 @@ push_gcm_client_deliver_cb (SoupSession *session,
        (ar = json_node_get_array(node))) {
       length = json_array_get_length(ar);
       for (i = 0; i < length && list; i++, list = list->next) {
+         /*
+          * TODO: Handle the case that the device_token has been renamed.
+          */
          removed = FALSE;
          if ((obj = json_array_get_object_element(ar, i)) &&
              json_object_has_member(obj, "error") &&
