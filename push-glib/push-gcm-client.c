@@ -128,7 +128,34 @@ push_gcm_client_deliver_cb (SoupSession *session,
    g_assert(SOUP_IS_MESSAGE(message));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   g_print("RESPONSE: \"%s\"\n", message->response_body->data);
+   switch (message->status_code) {
+   case SOUP_STATUS_OK:
+      break;
+   case SOUP_STATUS_BAD_REQUEST:
+      /*
+       * TODO: Log that there was a JSON encoding error likely.
+       */
+      break;
+   case SOUP_STATUS_UNAUTHORIZED:
+      g_simple_async_result_set_error(simple,
+                                      SOUP_HTTP_ERROR,
+                                      message->status_code,
+                                      _("GCM request unauthorized."));
+      GOTO(failure);
+   default:
+      if (SOUP_STATUS_IS_SERVER_ERROR(message->status_code) &&
+          (str = soup_message_headers_get_one(message->response_headers,
+                                              "Retry-After"))) {
+         /*
+          * TODO: Implement exponential back-off.
+          */
+      }
+      g_simple_async_result_set_error(simple,
+                                      SOUP_HTTP_ERROR,
+                                      message->status_code,
+                                      _("Unknown failure occurred."));
+      break;
+   }
 
    if (!message->response_body->data || !message->response_body->length) {
       g_simple_async_result_set_error(simple,
