@@ -405,7 +405,10 @@ mongo_cursor_foreach_dispatch (MongoConnection    *connection,
 
    for (iter = list, i = 0; iter; iter = iter->next, i++) {
       bson = iter->data;
-      if (((offset + i) >= priv->limit) || !func(cursor, bson, func_data)) {
+      if (priv->limit && (offset + i) >= priv->limit) {
+         GOTO(stop);
+      }
+      if (!func(cursor, bson, func_data)) {
          GOTO(stop);
       }
    }
