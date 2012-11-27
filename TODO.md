@@ -2,8 +2,7 @@
 
  * Delay of notification delivery.
  * Add /status HTTP page.
- * Use cursors for handling mongo replies as it doesnt always return same
-   number of results.
+ * Python drivers for twisted and urllib.
 
 # Things that would be nice.
 
