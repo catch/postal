@@ -22,8 +22,17 @@
 
 #include <glib/gi18n.h>
 #include <stdlib.h>
+#include <unistd.h>
 
+#ifdef __linux__
+#include <sys/utsname.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif /* __linux__ */
+
+#include "neo-logger-unix.h"
 #include "postal-application.h"
+#include "postal-debug.h"
 #include "postal-http.h"
 #ifdef ENABLE_REDIS
 #include "postal-redis.h"
@@ -31,6 +40,9 @@
 #include "postal-service.h"
 
 G_DEFINE_TYPE(PostalApplication, postal_application, G_TYPE_APPLICATION)
+
+static NeoLogger *gLoggerStdout;
+static guint      gPid;
 
 /**
  * postal_application_command_line:
@@ -128,6 +140,74 @@ cleanup:
    return ret;
 }
 
+static inline guint
+postal_application_get_thread (void)
+{
+#if __linux__
+   return (gint)syscall(SYS_gettid);
+#else
+   return getpid();
+#endif /* __linux__ */
+}
+
+static void
+postal_application_log_handler (const gchar    *log_domain,
+                                GLogLevelFlags  log_level,
+                                const gchar    *message,
+                                gpointer        user_data)
+{
+   const gchar *log_level_str = "UNKNOWN";
+   const gchar *host;
+   GTimeVal event_time;
+   struct tm tt;
+   time_t t;
+   gchar *formatted = NULL;
+   gchar ftime[32];
+   guint tid;
+
+   tid = postal_application_get_thread();
+
+   g_get_current_time(&event_time);
+   t = (time_t)event_time.tv_sec;
+   localtime_r(&t, &tt);
+   strftime(ftime, sizeof ftime, "%Y/%m/%d %H:%M:%S", &tt);
+   ftime[31] = '\0';
+
+   #define CASE_LEVEL_STR(_l) case G_LOG_LEVEL_##_l: log_level_str = #_l; break
+   switch ((log_level & G_LOG_LEVEL_MASK)) {
+   CASE_LEVEL_STR(ERROR);
+   CASE_LEVEL_STR(CRITICAL);
+   CASE_LEVEL_STR(WARNING);
+   CASE_LEVEL_STR(MESSAGE);
+   CASE_LEVEL_STR(INFO);
+   CASE_LEVEL_STR(DEBUG);
+   case POSTAL_LOG_LEVEL_TRACE:
+      log_level_str = "TRACE";
+   default: break;
+   }
+   #undef CASE_LEVEL_STR
+
+   host = g_get_host_name();
+   formatted = g_strdup_printf("%s.%04ld  %s: %14s[%d]: %8s: %s\n",
+                               ftime,
+                               event_time.tv_usec / 100,
+                               host,
+                               log_domain,
+                               tid,
+                               log_level_str,
+                               message);
+   neo_logger_log(gLoggerStdout,
+                  &event_time,
+                  log_domain,
+                  host,
+                  gPid,
+                  tid,
+                  log_level,
+                  message,
+                  formatted);
+   g_free(formatted);
+}
+
 static void
 postal_application_class_init (PostalApplicationClass *klass)
 {
@@ -140,4 +220,7 @@ postal_application_class_init (PostalApplicationClass *klass)
 static void
 postal_application_init (PostalApplication *application)
 {
+   gPid = getpid();
+   gLoggerStdout = neo_logger_unix_new(STDOUT_FILENO, FALSE);
+   g_log_set_default_handler(postal_application_log_handler, NULL);
 }
