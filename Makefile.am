@@ -22,6 +22,7 @@ sysconf_DATA =
 sysconf_DATA += conf/postal.conf
 
 EXTRA_DIST += $(postaldoc_DATA)
+EXTRA_DIST += $(sysconf_DATA)
 
 dist-hook:
 	@if test -d "$(srcdir)/.git"; then                              \
