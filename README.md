@@ -32,6 +32,30 @@ Postal is a push notification server for various mobile platforms.
    perform authentication for your users. You do that in your API and then
    communicate with Postal internally.
 
+## Installation
+
+### Requirements
+
+ * gobject >= 2.32
+ * libsoup >= 2.26
+ * json-glib >= 0.14
+
+### Linux
+
+#### Installation from release
+
+ * TODO: Update for first release
+
+#### Installation from git
+
+```sh
+git clone https://github.com/catch/postal.git
+cd postal
+./autogen.sh --enable-silent-rules --enable-debug=minimum --enable-trace=no
+make
+make install
+```
+
 ## REST API
 
  * TODO: Describe REST API.
