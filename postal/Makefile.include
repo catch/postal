@@ -29,6 +29,7 @@ libpostal_la_CPPFLAGS =
 libpostal_la_CPPFLAGS += $(SOUP_CFLAGS)
 libpostal_la_CPPFLAGS += $(JSON_CFLAGS)
 libpostal_la_CPPFLAGS += -DG_LOG_DOMAIN="\"postal\""
+libpostal_la_CPPFLAGS += -DSYSCONFDIR="\"${sysconfdir}\""
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/cut-n-paste
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/mongo-glib
 libpostal_la_CPPFLAGS += -I$(top_srcdir)

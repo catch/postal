@@ -18,6 +18,9 @@ postaldoc_DATA += NEWS
 postaldoc_DATA += README
 postaldoc_DATA += README.md
 
+sysconf_DATA =
+sysconf_DATA += conf/postal.conf
+
 EXTRA_DIST += $(postaldoc_DATA)
 
 dist-hook:

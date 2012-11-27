@@ -93,6 +93,14 @@ postal_application_command_line (GApplication            *application,
     * go ahead and load the configuration file and start the service.
     */
    if (!g_application_command_line_get_is_remote(command_line)) {
+#ifdef SYSCONFDIR
+      if (!config) {
+         if (g_file_test(SYSCONFDIR"/postal.conf", G_FILE_TEST_EXISTS)) {
+            config = g_strdup(SYSCONFDIR"/postal.conf");
+         }
+      }
+#endif
+
       if (config) {
          key_file = g_key_file_new();
          if (!g_key_file_load_from_file(key_file,
