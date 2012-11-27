@@ -16,6 +16,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _GNU_SOURCE
+
+#include <errno.h>
 #include <glib/gi18n.h>
 #include <unistd.h>
 
@@ -56,7 +59,14 @@ neo_logger_unix_log (NeoLogger      *logger,
 {
    NeoLoggerUnix *ux = (NeoLoggerUnix *)logger;
    if (ux->fileno >= 0) {
-      write(ux->fileno, formatted, strlen(formatted));
+#ifdef TEMP_FAILURE_RETRY
+      TEMP_FAILURE_RETRY(
+#endif
+         write(ux->fileno, formatted, strlen(formatted))
+#ifdef TEMP_FAILURE_RETRY
+      )
+#endif
+      ;
    }
 }
 
