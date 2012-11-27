@@ -40,6 +40,10 @@ Postal is a push notification server for various mobile platforms.
  * libsoup >= 2.26
  * json-glib >= 0.14
 
+#### Optional
+
+ * hiredis for metrics delivery
+
 ### Linux
 
 #### Installation from release
