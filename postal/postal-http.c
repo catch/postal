@@ -457,7 +457,6 @@ device_handler (UrlRouter         *router,
                 SoupClientContext *client,
                 gpointer           user_data)
 {
-   MongoObjectId *oid;
    PostalDevice *pdev;
    const gchar *user;
    const gchar *device;
@@ -488,16 +487,10 @@ device_handler (UrlRouter         *router,
       soup_server_pause_message(server, message);
       EXIT;
    } else if (message->method == SOUP_METHOD_DELETE) {
-      if (!(oid = mongo_object_id_new_from_string(device))) {
-         soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
-         soup_server_unpause_message(gServer, message);
-         EXIT;
-      }
       pdev = g_object_new(POSTAL_TYPE_DEVICE,
+                          "device-token", device,
                           "user", user,
-                          "id", oid,
                           NULL);
-      mongo_object_id_free(oid);
       postal_service_remove_device(POSTAL_SERVICE_DEFAULT,
                                    pdev,
                                    NULL, /* TODO */
@@ -507,23 +500,16 @@ device_handler (UrlRouter         *router,
       g_object_unref(pdev);
       EXIT;
    } else if (message->method == SOUP_METHOD_PUT) {
-      if (!(oid = mongo_object_id_new_from_string(device))) {
-         soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
-         soup_server_unpause_message(gServer, message);
-         EXIT;
-      }
       if (!(node = postal_http_parse_body(message, &error))) {
          postal_http_reply_error(message, error);
          soup_server_unpause_message(server, message);
-         mongo_object_id_free(oid);
          g_error_free(error);
          EXIT;
       }
       pdev = g_object_new(POSTAL_TYPE_DEVICE,
+                          "device-token", device,
                           "user", user,
-                          "id", oid,
                           NULL);
-      mongo_object_id_free(oid);
       if (!postal_device_load_from_json(pdev, node, &error)) {
          postal_http_reply_error(message, error);
          soup_server_unpause_message(server, message);
