@@ -632,13 +632,14 @@ postal_service_find_device (PostalService       *service,
 {
    PostalServicePrivate *priv;
    GSimpleAsyncResult *simple;
-   MongoObjectId *_id;
+   MongoObjectId *oid;
    MongoBson *q;
 
    ENTRY;
 
    g_return_if_fail(POSTAL_IS_SERVICE(service));
    g_return_if_fail(user);
+   g_return_if_fail(device);
    g_return_if_fail(!cancellable || G_IS_CANCELLABLE(cancellable));
    g_return_if_fail(callback);
 
@@ -646,22 +647,11 @@ postal_service_find_device (PostalService       *service,
 
    q = mongo_bson_new_empty();
 
-   if (!(_id = mongo_object_id_new_from_string(device))) {
-      g_simple_async_report_error_in_idle(G_OBJECT(service),
-                                          callback,
-                                          user_data,
-                                          POSTAL_DEVICE_ERROR,
-                                          POSTAL_DEVICE_ERROR_INVALID_ID,
-                                          _("device id is invalid."));
-      GOTO(failure);
-   }
+   mongo_bson_append_string(q, "device_token", device);
 
-   mongo_bson_append_object_id(q, "_id", _id);
-   mongo_object_id_free(_id);
-
-   if ((_id = mongo_object_id_new_from_string(user))) {
-      mongo_bson_append_object_id(q, "user", _id);
-      mongo_object_id_free(_id);
+   if ((oid = mongo_object_id_new_from_string(user))) {
+      mongo_bson_append_object_id(q, "user", oid);
+      mongo_object_id_free(oid);
    } else {
       mongo_bson_append_string(q, "user", user);
    }
@@ -679,7 +669,6 @@ postal_service_find_device (PostalService       *service,
                                 postal_service_find_device_cb,
                                 simple);
 
-failure:
    mongo_bson_unref(q);
 
    EXIT;
