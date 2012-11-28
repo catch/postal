@@ -25,7 +25,6 @@ G_DEFINE_TYPE(PostalDevice, postal_device, G_TYPE_OBJECT)
 
 struct _PostalDevicePrivate
 {
-   MongoObjectId *_id;
    gchar *user;
    gchar *device_token;
    gchar *device_type;
@@ -37,7 +36,6 @@ enum
    PROP_USER,
    PROP_DEVICE_TOKEN,
    PROP_DEVICE_TYPE,
-   PROP_ID,
    LAST_PROP
 };
 
@@ -157,43 +155,6 @@ postal_device_set_device_type (PostalDevice *device,
 }
 
 /**
- * postal_device_get_id:
- * @device: (in): A #PostalDevice.
- *
- * Gets the :id property of @device.
- *
- * Returns: (transfer none): A #MongoObjectId.
- */
-const MongoObjectId *
-postal_device_get_id (PostalDevice *device)
-{
-   g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
-   return device->priv->_id;
-}
-
-/**
- * postal_device_set_id:
- * @device: (in): A #PostalDevice.
- * @id: (in): A #MongoObjectId.
- *
- * Sets the :id property of @device.
- */
-void
-postal_device_set_id (PostalDevice        *device,
-                      const MongoObjectId *id)
-{
-   ENTRY;
-
-   g_return_if_fail(POSTAL_IS_DEVICE(device));
-
-   mongo_object_id_free(device->priv->_id);
-   device->priv->_id = mongo_object_id_copy(id);
-   g_object_notify_by_pspec(G_OBJECT(device), gParamSpecs[PROP_ID]);
-
-   EXIT;
-}
-
-/**
  * postal_device_save_to_bson:
  * @device: (in): A #PostalDevice.
  * @error: (out): A location for a #GError, or %NULL.
@@ -228,15 +189,9 @@ postal_device_save_to_bson (PostalDevice  *device,
       return NULL;
    }
 
-   /*
-    * Create a new object id for this device if this is a new device.
-    */
-   if (!priv->_id) {
-      priv->_id = mongo_object_id_new();
-   }
-
    ret = mongo_bson_new_empty();
-   mongo_bson_append_object_id(ret, "_id", priv->_id);
+   mongo_bson_append_string(ret, "device_token", priv->device_token);
+   mongo_bson_append_string(ret, "device_type", priv->device_type);
 
    /*
     * Special case user to opportunistically use ObjectId.
@@ -249,9 +204,6 @@ postal_device_save_to_bson (PostalDevice  *device,
       mongo_bson_append_string(ret, "user", priv->user);
    }
 
-   mongo_bson_append_string(ret, "device_type", priv->device_type);
-   mongo_bson_append_string(ret, "device_token", priv->device_token);
-
    RETURN(ret);
 }
 
@@ -262,7 +214,6 @@ postal_device_save_to_json (PostalDevice  *device,
    PostalDevicePrivate *priv;
    JsonObject *obj;
    JsonNode *node;
-   gchar *str;
 
    g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
 
@@ -270,16 +221,10 @@ postal_device_save_to_json (PostalDevice  *device,
 
    obj = json_object_new();
 
-   if (priv->_id) {
-      str = mongo_object_id_to_string(priv->_id);
-      json_object_set_string_member(obj, "_id", str);
-      g_free(str);
-   }
-
-   if (priv->user) {
-      json_object_set_string_member(obj, "user", priv->user);
+   if (priv->device_token) {
+      json_object_set_string_member(obj, "device_token", priv->device_token);
    } else {
-      json_object_set_null_member(obj, "user");
+      json_object_set_null_member(obj, "device_token");
    }
 
    if (priv->device_type) {
@@ -288,10 +233,10 @@ postal_device_save_to_json (PostalDevice  *device,
       json_object_set_null_member(obj, "device_type");
    }
 
-   if (priv->device_token) {
-      json_object_set_string_member(obj, "device_token", priv->device_token);
+   if (priv->user) {
+      json_object_set_string_member(obj, "user", priv->user);
    } else {
-      json_object_set_null_member(obj, "device_token");
+      json_object_set_null_member(obj, "user");
    }
 
    /*
@@ -367,9 +312,9 @@ postal_device_finalize (GObject *object)
 
    priv = POSTAL_DEVICE(object)->priv;
 
-   mongo_object_id_free(priv->_id);
-   g_free(priv->user);
    g_free(priv->device_token);
+   g_free(priv->device_type);
+   g_free(priv->user);
 
    G_OBJECT_CLASS(postal_device_parent_class)->finalize(object);
 
@@ -385,14 +330,14 @@ postal_device_get_property (GObject    *object,
    PostalDevice *device = POSTAL_DEVICE(object);
 
    switch (prop_id) {
-   case PROP_USER:
-      g_value_set_string(value, postal_device_get_user(device));
-      break;
    case PROP_DEVICE_TOKEN:
       g_value_set_string(value, postal_device_get_device_token(device));
       break;
-   case PROP_ID:
-      g_value_set_boxed(value, postal_device_get_id(device));
+   case PROP_DEVICE_TYPE:
+      g_value_set_string(value, postal_device_get_device_type(device));
+      break;
+   case PROP_USER:
+      g_value_set_string(value, postal_device_get_user(device));
       break;
    default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -408,14 +353,14 @@ postal_device_set_property (GObject      *object,
    PostalDevice *device = POSTAL_DEVICE(object);
 
    switch (prop_id) {
-   case PROP_USER:
-      postal_device_set_user(device, g_value_get_string(value));
-      break;
    case PROP_DEVICE_TOKEN:
       postal_device_set_device_token(device, g_value_get_string(value));
       break;
-   case PROP_ID:
-      postal_device_set_id(device, g_value_get_boxed(value));
+   case PROP_DEVICE_TYPE:
+      postal_device_set_device_type(device, g_value_get_string(value));
+      break;
+   case PROP_USER:
+      postal_device_set_user(device, g_value_get_string(value));
       break;
    default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -435,15 +380,6 @@ postal_device_class_init (PostalDeviceClass *klass)
    object_class->set_property = postal_device_set_property;
    g_type_class_add_private(object_class, sizeof(PostalDevicePrivate));
 
-   gParamSpecs[PROP_USER] =
-      g_param_spec_string("user",
-                          _("User"),
-                          _("The owner of the device."),
-                          NULL,
-                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
-   g_object_class_install_property(object_class, PROP_USER,
-                                   gParamSpecs[PROP_USER]);
-
    gParamSpecs[PROP_DEVICE_TOKEN] =
       g_param_spec_string("device-token",
                           _("Device Token"),
@@ -462,14 +398,14 @@ postal_device_class_init (PostalDeviceClass *klass)
    g_object_class_install_property(object_class, PROP_DEVICE_TYPE,
                                    gParamSpecs[PROP_DEVICE_TYPE]);
 
-   gParamSpecs[PROP_ID] =
-      g_param_spec_boxed("id",
-                         _("Id"),
-                         _("The device identifier."),
-                          MONGO_TYPE_OBJECT_ID,
-                         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
-   g_object_class_install_property(object_class, PROP_ID,
-                                   gParamSpecs[PROP_ID]);
+   gParamSpecs[PROP_USER] =
+      g_param_spec_string("user",
+                          _("User"),
+                          _("The owner of the device."),
+                          NULL,
+                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_USER,
+                                   gParamSpecs[PROP_USER]);
 
    EXIT;
 }

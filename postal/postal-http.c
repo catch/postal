@@ -594,7 +594,6 @@ devices_post_cb (GObject      *object,
    SoupMessage *message = user_data;
    GError *error = NULL;
    gchar *str;
-   gchar *oid;
 
    ENTRY;
 
@@ -608,17 +607,12 @@ devices_post_cb (GObject      *object,
    }
 
    if ((device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(message), "device")))) {
-      /*
-       * Set Location: header.
-       */
-      oid = mongo_object_id_to_string(postal_device_get_id(device));
       str = g_strdup_printf("/v1/users/%s/devices/%s",
                             postal_device_get_user(device),
-                            oid);
+                            postal_device_get_device_token(device));
       soup_message_headers_append(message->response_headers,
                                   "Location",
                                   str);
-      g_free(oid);
       g_free(str);
 
       /*

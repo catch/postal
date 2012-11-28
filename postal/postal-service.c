@@ -282,9 +282,9 @@ postal_service_remove_device (PostalService       *service,
                               gpointer             user_data)
 {
    PostalServicePrivate *priv;
-   const MongoObjectId *id;
    GSimpleAsyncResult *simple;
    MongoObjectId *user_id;
+   const gchar *device_token;
    const gchar *user;
    MongoBson *q;
    MongoBson *u;
@@ -303,7 +303,7 @@ postal_service_remove_device (PostalService       *service,
    /*
     * Make sure we have an _id field to remove.
     */
-   if (!(id = postal_device_get_id(device))) {
+   if (!(device_token = postal_device_get_device_token(device))) {
       g_simple_async_report_error_in_idle(G_OBJECT(service),
                                           callback,
                                           user_data,
@@ -333,7 +333,7 @@ postal_service_remove_device (PostalService       *service,
     * Build our query for the device to remove.
     */
    q = mongo_bson_new_empty();
-   mongo_bson_append_object_id(q, "_id", id);
+   mongo_bson_append_string(q, "device_token", device_token);
    if ((user_id = mongo_object_id_new_from_string(user))) {
       mongo_bson_append_object_id(q, "user", user_id);
       mongo_object_id_free(user_id);
@@ -749,9 +749,9 @@ postal_service_update_device (PostalService       *service,
                               gpointer             user_data)
 {
    PostalServicePrivate *priv;
-   const MongoObjectId *id;
    GSimpleAsyncResult *simple;
    MongoObjectId *user_id;
+   const gchar *device_token;
    const gchar *user;
    MongoBson *q;
    MongoBson *u;
@@ -769,7 +769,7 @@ postal_service_update_device (PostalService       *service,
    /*
     * Make sure we have an _id field to remove.
     */
-   if (!(id = postal_device_get_id(device))) {
+   if (!(device_token = postal_device_get_device_token(device))) {
       g_simple_async_report_error_in_idle(G_OBJECT(service),
                                           callback,
                                           user_data,
@@ -810,7 +810,7 @@ postal_service_update_device (PostalService       *service,
     * Build our query for the device to update.
     */
    q = mongo_bson_new_empty();
-   mongo_bson_append_object_id(q, "_id", id);
+   mongo_bson_append_string(q, "device_token", device_token);
    if ((user_id = mongo_object_id_new_from_string(user))) {
       mongo_bson_append_object_id(q, "user", user_id);
       mongo_object_id_free(user_id);

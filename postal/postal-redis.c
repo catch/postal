@@ -108,11 +108,9 @@ static gchar *
 postal_redis_build_message (PostalDevice *device,
                             const gchar  *action)
 {
-   const MongoObjectId *device_oid;
    const gchar *device_type;
    const gchar *device_token;
    const gchar *user;
-   gchar *device_id;
    gchar *ret;
 
    g_assert(POSTAL_IS_DEVICE(device));
@@ -120,24 +118,18 @@ postal_redis_build_message (PostalDevice *device,
 
    device_type = postal_device_get_device_type(device);
    device_token = postal_device_get_device_token(device);
-   device_oid = postal_device_get_id(device);
-   device_id = mongo_object_id_to_string(device_oid);
    user = postal_device_get_user(device);
 
    ret = g_strdup_printf("{\n"
                          "  \"Action\": \"%s\",\n"
                          "  \"DeviceType\": \"%s\",\n"
-                         "  \"DeviceId\": \"%s\",\n"
                          "  \"DeviceToken\": \"%s\",\n"
                          "  \"User\": \"%s\"\n"
                          "}",
                          action,
                          device_type,
-                         device_id,
                          device_token,
                          user);
-
-   g_free(device_id);
 
    return ret;
 }

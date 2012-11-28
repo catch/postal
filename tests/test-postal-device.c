@@ -9,14 +9,15 @@ test1 (void)
    gboolean r;
 
    d = postal_device_new();
-   g_assert(!postal_device_get_id(d));
+   g_assert(!postal_device_get_device_token(d));
    b = postal_device_save_to_bson(d, NULL);
    g_assert(!b);
    postal_device_set_user(d, "000011110000111100001111");
+   postal_device_set_device_token(d, "11231213@#12312098743921873");
+   g_assert(postal_device_get_device_token(d));
    b = postal_device_save_to_bson(d, NULL);
    g_assert(b);
-   g_assert(postal_device_get_id(d));
-   r = mongo_bson_iter_init_find(&iter, b, "_id");
+   r = mongo_bson_iter_init_find(&iter, b, "device_token");
    g_assert(r);
    mongo_bson_unref(b);
    g_object_unref(d);

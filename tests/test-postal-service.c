@@ -4,7 +4,7 @@ static GMainLoop   *gMainLoop;
 static gboolean     gSuccess;
 static const gchar  gKeyData[] =
    "[mongo]\n"
-   "uri = mongodb://127.0.0.1:27017\n"
+   "uri = mongodb://127.0.0.1:27017/?w=1&fsync=true\n"
    "db = test\n"
    "collection = devices\n";
 
@@ -13,11 +13,10 @@ test1_cb3 (GObject      *object,
            GAsyncResult *result,
            gpointer      user_data)
 {
-   const MongoObjectId *o;
    MongoObjectId *oo;
    PostalService *service = (PostalService *)object;
    PostalDevice *device = user_data;
-   MongoBsonIter i;
+   MongoBsonIter i = { 0 };
    MongoBson *b;
    GError *error = NULL;
    GList *list;
@@ -27,11 +26,18 @@ test1_cb3 (GObject      *object,
    g_assert_no_error(error);
    g_assert(list);
 
-   b = g_list_last(list)->data;
-   g_assert(mongo_bson_iter_init_find(&i, b, "_id"));
-   o = mongo_bson_iter_get_value_object_id(&i);
-   g_assert(o);
-   g_assert(mongo_object_id_equal(o, postal_device_get_id(device)));
+   for (; list; list = list->next) {
+      g_assert(mongo_bson_iter_init_find(&i, list->data, "device_token"));
+      s = (gchar *)mongo_bson_iter_get_value_string(&i, NULL);
+      if (!g_strcmp0(s, postal_device_get_device_token(device))) {
+         break;
+      }
+   }
+
+   g_assert(list);
+   b = list->data;
+   s = (gchar *)mongo_bson_iter_get_value_string(&i, NULL);
+   g_assert_cmpstr(postal_device_get_device_token(device), ==, s);
    g_assert(mongo_bson_iter_init_find(&i, b, "user"));
    g_assert(mongo_bson_iter_get_value_type(&i) == MONGO_BSON_OBJECT_ID);
    oo = mongo_bson_iter_get_value_object_id(&i);
@@ -98,7 +104,6 @@ test1_cb (GObject      *object,
    g_assert_no_error(error);
    g_assert(ret);
 
-   postal_device_set_device_token(device, "my_device_token");
    postal_service_update_device(service, device, NULL, test1_cb1, device);
 }
 
@@ -108,6 +113,7 @@ test1 (void)
    PostalService *service;
    PostalDevice *device;
    GKeyFile *key_file;
+   gchar *rand_str;
 
    gSuccess = FALSE;
    key_file = g_key_file_new();
@@ -116,8 +122,10 @@ test1 (void)
    postal_service_set_config(service, key_file);
    postal_service_start(service);
    device = postal_device_new();
+   rand_str = g_strdup_printf("%d", g_random_int());
+   postal_device_set_device_token(device, rand_str);
+   g_free(rand_str);
    postal_device_set_user(device, "000011110000111100001111");
-   postal_device_set_device_token(device, "some_token");
    postal_device_set_device_type(device, "c2dm");
    postal_service_add_device(service, device, NULL, test1_cb, device);
    g_main_loop_run(gMainLoop);
