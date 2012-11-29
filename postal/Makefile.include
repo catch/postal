@@ -3,6 +3,7 @@ bin_PROGRAMS = postald
 noinst_LTLIBRARIES += libpostal.la
 
 libpostal_la_SOURCES =
+libpostal_la_SOURCES += $(top_srcdir)/cut-n-paste/neo-debug.h
 libpostal_la_SOURCES += $(top_srcdir)/cut-n-paste/neo-logger.c
 libpostal_la_SOURCES += $(top_srcdir)/cut-n-paste/neo-logger.h
 libpostal_la_SOURCES += $(top_srcdir)/cut-n-paste/neo-logger-daily.c
