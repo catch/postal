@@ -19,11 +19,36 @@
 #ifndef POSTAL_HTTP_H
 #define POSTAL_HTTP_H
 
-#include <glib.h>
+#include <neo-service.h>
 
 G_BEGIN_DECLS
 
-void postal_http_init (GKeyFile *config);
+#define POSTAL_TYPE_HTTP            (postal_http_get_type())
+#define POSTAL_HTTP(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_HTTP, PostalHttp))
+#define POSTAL_HTTP_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_HTTP, PostalHttp const))
+#define POSTAL_HTTP_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  POSTAL_TYPE_HTTP, PostalHttpClass))
+#define POSTAL_IS_HTTP(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), POSTAL_TYPE_HTTP))
+#define POSTAL_IS_HTTP_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  POSTAL_TYPE_HTTP))
+#define POSTAL_HTTP_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  POSTAL_TYPE_HTTP, PostalHttpClass))
+
+typedef struct _PostalHttp        PostalHttp;
+typedef struct _PostalHttpClass   PostalHttpClass;
+typedef struct _PostalHttpPrivate PostalHttpPrivate;
+
+struct _PostalHttp
+{
+   NeoService parent;
+
+   /*< private >*/
+   PostalHttpPrivate *priv;
+};
+
+struct _PostalHttpClass
+{
+   NeoServiceClass parent_class;
+};
+
+GType postal_http_get_type (void) G_GNUC_CONST;
 
 G_END_DECLS
 

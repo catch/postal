@@ -43,8 +43,9 @@ G_DEFINE_TYPE(PostalApplication, postal_application, G_TYPE_APPLICATION)
 
 struct _PostalApplicationPrivate
 {
-   gboolean  activated;
-   GKeyFile *config;
+   gboolean    activated;
+   GKeyFile   *config;
+   PostalHttp *http;
 };
 
 enum
@@ -132,13 +133,16 @@ postal_application_activate (GApplication *application)
    g_object_set(POSTAL_SERVICE_DEFAULT,
                 "config", priv->config,
                 NULL);
-   postal_http_init(priv->config);
+   priv->http = g_object_new(POSTAL_TYPE_HTTP,
+                             "config", priv->config,
+                             NULL);
 #ifdef ENABLE_REDIS
    postal_redis_init(priv->config);
 #endif
 
    g_application_hold(application);
 
+   neo_service_start(NEO_SERVICE(priv->http));
    postal_service_start(POSTAL_SERVICE_DEFAULT);
 
    EXIT;

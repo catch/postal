@@ -23,109 +23,24 @@
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
 
-#include "neo-logger-daily.h"
 #include "postal-debug.h"
 #include "postal-http.h"
 #include "postal-service.h"
+
+#include "neo-logger.h"
+#include "neo-logger-daily.h"
+
 #include "url-router.h"
 
-static SoupServer *gServer;
-static NeoLogger  *gLogger;
+G_DEFINE_TYPE(PostalHttp, postal_http, NEO_TYPE_SERVICE)
 
-GQuark
-postal_json_error_quark (void)
+struct _PostalHttpPrivate
 {
-   return g_quark_from_static_string("PostalJsonError");
-}
-
-static void
-postal_http_log_message (SoupMessage       *message,
-                         const gchar       *path,
-                         SoupClientContext *client)
-{
-   const gchar *ip_addr;
-   const gchar *version;
-   GTimeVal event_time;
-   struct tm tt;
-   time_t t;
-   gchar *epath;
-   gchar *formatted = NULL;
-   gchar *referrer;
-   gchar *user_agent;
-   gchar ftime[32];
-
-   g_assert(SOUP_IS_MESSAGE(message));
-   g_assert(client);
-
-   g_get_current_time(&event_time);
-   t = (time_t)event_time.tv_sec;
-   localtime_r(&t, &tt);
-   strftime(ftime, sizeof ftime, "%b %d %H:%M:%S", &tt);
-   ftime[31] = '\0';
-
-   switch (soup_message_get_http_version(message)) {
-   case SOUP_HTTP_1_0:
-      version = "HTTP/1.0";
-      break;
-   case SOUP_HTTP_1_1:
-      version = "HTTP/1.1";
-      break;
-   default:
-      g_assert_not_reached();
-      version = NULL;
-      break;
-   }
-
-   ip_addr = soup_client_context_get_host(client);
-   referrer = (gchar *)soup_message_headers_get_one(message->request_headers, "Referrer");
-   user_agent = (gchar *)soup_message_headers_get_one(message->request_headers, "User-Agent");
-
-   epath = g_strescape(path, NULL);
-   referrer = g_strescape(referrer ?: "", NULL);
-   user_agent = g_strescape(user_agent ?: "", NULL);
-
-   formatted = g_strdup_printf("%s %s \"%s %s %s\" %u %"G_GSIZE_FORMAT" \"%s\" \"%s\"\n",
-                               ip_addr,
-                               ftime,
-                               message->method,
-                               epath,
-                               version,
-                               message->status_code,
-                               message->response_body->length,
-                               referrer,
-                               user_agent);
-
-   neo_logger_log(gLogger, &event_time, NULL, NULL, 0, 0, 0, NULL, formatted);
-
-   g_free(epath);
-   g_free(referrer);
-   g_free(user_agent);
-   g_free(formatted);
-}
-
-static void
-postal_http_router (SoupServer        *server,
-                    SoupMessage       *message,
-                    const gchar       *path,
-                    GHashTable        *query,
-                    SoupClientContext *client,
-                    gpointer           user_data)
-{
-   UrlRouter *router = user_data;
-
-   ENTRY;
-
-   g_assert(SOUP_IS_SERVER(server));
-   g_assert(SOUP_IS_MESSAGE(message));
-   g_assert(path);
-   g_assert(client);
-
-   if (!url_router_route(router, server, message, path, query, client)) {
-      soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
-   }
-
-   EXIT;
-}
+   gboolean    started;
+   NeoLogger  *logger;
+   UrlRouter  *router;
+   SoupServer *server;
+};
 
 static guint
 get_int_param (GHashTable  *hashtable,
@@ -140,6 +55,12 @@ get_int_param (GHashTable  *hashtable,
    }
 
    return 0;
+}
+
+GQuark
+postal_json_error_quark (void)
+{
+   return g_quark_from_static_string("PostalJsonError");
 }
 
 static JsonNode *
@@ -178,7 +99,8 @@ postal_http_parse_body (SoupMessage  *message,
 }
 
 static void
-postal_http_reply_devices (SoupMessage *message,
+postal_http_reply_devices (PostalHttp  *http,
+                           SoupMessage *message,
                            guint        status,
                            GPtrArray   *devices)
 {
@@ -221,7 +143,7 @@ postal_http_reply_devices (SoupMessage *message,
                              json_buf,
                              length);
    soup_message_set_status(message, status ?: SOUP_STATUS_OK);
-   soup_server_unpause_message(gServer, message);
+   soup_server_unpause_message(http->priv->server, message);
 }
 
 static guint
@@ -252,7 +174,8 @@ get_status_code (const GError *error)
 }
 
 static void
-postal_http_reply_error (SoupMessage  *message,
+postal_http_reply_error (PostalHttp   *http,
+                         SoupMessage  *message,
                          const GError *error)
 {
    JsonGenerator *g;
@@ -287,14 +210,16 @@ postal_http_reply_error (SoupMessage  *message,
                              json_buf,
                              length);
    soup_message_set_status(message, get_status_code(error));
-   soup_server_unpause_message(gServer, message);
+   soup_server_unpause_message(http->priv->server, message);
 }
 
 static void
-postal_http_reply_device(SoupMessage  *message,
-                         guint         status,
-                         PostalDevice *device)
+postal_http_reply_device (PostalHttp   *http,
+                          SoupMessage  *message,
+                          guint         status,
+                          PostalDevice *device)
 {
+   PostalHttpPrivate *priv;
    JsonGenerator *g;
    JsonNode *node;
    GError *error = NULL;
@@ -305,10 +230,13 @@ postal_http_reply_device(SoupMessage  *message,
 
    g_assert(SOUP_IS_MESSAGE(message));
    g_assert(POSTAL_IS_DEVICE(device));
+   g_assert(POSTAL_IS_HTTP(http));
+
+   priv = http->priv;
 
    if (!(node = postal_device_save_to_json(device, &error))) {
-      postal_http_reply_error(message, error);
-      soup_server_unpause_message(gServer, message);
+      postal_http_reply_error(http, message, error);
+      soup_server_unpause_message(priv->server, message);
       g_error_free(error);
       EXIT;
    }
@@ -326,34 +254,37 @@ postal_http_reply_device(SoupMessage  *message,
                                 length);
    }
    soup_message_set_status(message, status);
-   soup_server_unpause_message(gServer, message);
+   soup_server_unpause_message(priv->server, message);
    g_object_unref(g);
 
    EXIT;
 }
 
 static void
-device_cb (GObject      *object,
-           GAsyncResult *result,
-           gpointer      user_data)
+postal_http_find_device_cb (GObject      *object,
+                            GAsyncResult *result,
+                            gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GError *error = NULL;
 
    ENTRY;
 
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!(device = postal_service_find_device_finish(service, result, &error))) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    }
 
-   postal_http_reply_device(message, SOUP_STATUS_OK, device);
+   postal_http_reply_device(http, message, SOUP_STATUS_OK, device);
    g_object_unref(device);
 
 failure:
@@ -363,21 +294,24 @@ failure:
 }
 
 static void
-device_delete_cb (GObject      *object,
-                  GAsyncResult *result,
-                  gpointer      user_data)
+postal_http_remove_device_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GError *error = NULL;
 
    ENTRY;
 
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!postal_service_remove_device_finish(service, result, &error)) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    } else {
@@ -385,7 +319,7 @@ device_delete_cb (GObject      *object,
       soup_message_headers_append(message->response_headers,
                                   "Content-Type",
                                   "application/json");
-      soup_server_unpause_message(gServer, message);
+      soup_server_unpause_message(http->priv->server, message);
    }
 
 failure:
@@ -395,44 +329,48 @@ failure:
 }
 
 static void
-device_put_cb (GObject      *object,
-               GAsyncResult *result,
-               gpointer      user_data)
+postal_http_update_device_cb (GObject      *object,
+                              GAsyncResult *result,
+                              gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GError *error;
 
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!postal_service_update_device_finish(service, result, &error)) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    }
 
    device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(message), "device"));
-   postal_http_reply_device(message, SOUP_STATUS_OK, device);
+   postal_http_reply_device(http, message, SOUP_STATUS_OK, device);
 
 failure:
    g_object_unref(message);
 }
 
 static void
-device_handler (UrlRouter         *router,
-                SoupServer        *server,
-                SoupMessage       *message,
-                const gchar       *path,
-                GHashTable        *params,
-                GHashTable        *query,
-                SoupClientContext *client,
-                gpointer           user_data)
+postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
+                                                 SoupServer        *server,
+                                                 SoupMessage       *message,
+                                                 const gchar       *path,
+                                                 GHashTable        *params,
+                                                 GHashTable        *query,
+                                                 SoupClientContext *client,
+                                                 gpointer           user_data)
 {
    PostalDevice *pdev;
    const gchar *user;
    const gchar *device;
+   PostalHttp *http = user_data;
    GError *error = NULL;
    JsonNode *node;
 
@@ -446,6 +384,7 @@ device_handler (UrlRouter         *router,
    g_assert(g_hash_table_contains(params, "device"));
    g_assert(g_hash_table_contains(params, "user"));
    g_assert(client);
+   g_assert(POSTAL_IS_HTTP(http));
 
    device = g_hash_table_lookup(params, "device");
    user = g_hash_table_lookup(params, "user");
@@ -455,7 +394,7 @@ device_handler (UrlRouter         *router,
                                  user,
                                  device,
                                  NULL, /* TODO */
-                                 device_cb,
+                                 postal_http_find_device_cb,
                                  g_object_ref(message));
       soup_server_pause_message(server, message);
       EXIT;
@@ -467,14 +406,14 @@ device_handler (UrlRouter         *router,
       postal_service_remove_device(POSTAL_SERVICE_DEFAULT,
                                    pdev,
                                    NULL, /* TODO */
-                                   device_delete_cb,
+                                   postal_http_remove_device_cb,
                                    g_object_ref(message));
       soup_server_pause_message(server, message);
       g_object_unref(pdev);
       EXIT;
    } else if (message->method == SOUP_METHOD_PUT) {
       if (!(node = postal_http_parse_body(message, &error))) {
-         postal_http_reply_error(message, error);
+         postal_http_reply_error(http, message, error);
          soup_server_unpause_message(server, message);
          g_error_free(error);
          EXIT;
@@ -484,7 +423,7 @@ device_handler (UrlRouter         *router,
                           "user", user,
                           NULL);
       if (!postal_device_load_from_json(pdev, node, &error)) {
-         postal_http_reply_error(message, error);
+         postal_http_reply_error(http, message, error);
          soup_server_unpause_message(server, message);
          json_node_free(node);
          g_error_free(error);
@@ -492,13 +431,14 @@ device_handler (UrlRouter         *router,
          EXIT;
       }
       json_node_free(node);
-      g_object_set_data_full(G_OBJECT(message), "device",
+      g_object_set_data_full(G_OBJECT(message),
+                             "device",
                              g_object_ref(pdev),
                              g_object_unref);
       postal_service_update_device(POSTAL_SERVICE_DEFAULT,
                                    pdev,
                                    NULL, /* TODO */
-                                   device_put_cb,
+                                   postal_http_update_device_cb,
                                    g_object_ref(message));
       soup_server_pause_message(server, message);
       g_object_unref(pdev);
@@ -518,22 +458,25 @@ devices_get_cb (GObject      *object,
 {
    PostalService *service = (PostalService *)object;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GPtrArray *devices;
    GError *error = NULL;
 
    ENTRY;
 
    g_assert(POSTAL_IS_SERVICE(service));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!(devices = postal_service_find_devices_finish(service,
                                                       result,
                                                       &error))) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    }
 
-   postal_http_reply_devices(message, SOUP_STATUS_OK, devices);
+   postal_http_reply_devices(http, message, SOUP_STATUS_OK, devices);
    g_ptr_array_unref(devices);
 
 failure:
@@ -543,13 +486,14 @@ failure:
 }
 
 static void
-devices_post_cb (GObject      *object,
-                 GAsyncResult *result,
-                 gpointer      user_data)
+postal_http_add_device_cb (GObject      *object,
+                           GAsyncResult *result,
+                           gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GError *error = NULL;
    gchar *str;
 
@@ -557,9 +501,11 @@ devices_post_cb (GObject      *object,
 
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!postal_service_add_device_finish(service, result, &error)) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    }
@@ -572,11 +518,7 @@ devices_post_cb (GObject      *object,
                                   "Location",
                                   str);
       g_free(str);
-
-      /*
-       * Set response body and 201 Created.
-       */
-      postal_http_reply_device(message, SOUP_STATUS_CREATED, device);
+      postal_http_reply_device(http, message, SOUP_STATUS_CREATED, device);
    } else {
       g_assert_not_reached();
    }
@@ -588,17 +530,18 @@ failure:
 }
 
 static void
-devices_handler (UrlRouter         *router,
-                 SoupServer        *server,
-                 SoupMessage       *message,
-                 const gchar       *path,
-                 GHashTable        *params,
-                 GHashTable        *query,
-                 SoupClientContext *client,
-                 gpointer           user_data)
+postal_http_handle_v1_users_user_devices (UrlRouter         *router,
+                                          SoupServer        *server,
+                                          SoupMessage       *message,
+                                          const gchar       *path,
+                                          GHashTable        *params,
+                                          GHashTable        *query,
+                                          SoupClientContext *client,
+                                          gpointer           user_data)
 {
    PostalDevice *device;
    const gchar *user;
+   PostalHttp *http = user_data;
    JsonNode *node;
    GError *error = NULL;
 
@@ -611,6 +554,7 @@ devices_handler (UrlRouter         *router,
    g_assert(params);
    g_assert(g_hash_table_contains(params, "user"));
    g_assert(client);
+   g_assert(POSTAL_IS_HTTP(http));
 
    user = g_hash_table_lookup(params, "user");
    soup_server_pause_message(server, message);
@@ -626,14 +570,14 @@ devices_handler (UrlRouter         *router,
       EXIT;
    } else if (message->method == SOUP_METHOD_POST) {
       if (!(node = postal_http_parse_body(message, &error))) {
-         postal_http_reply_error(message, error);
+         postal_http_reply_error(http, message, error);
          soup_server_unpause_message(server, message);
          g_error_free(error);
          EXIT;
       }
       device = postal_device_new();
       if (!postal_device_load_from_json(device, node, &error)) {
-         postal_http_reply_error(message, error);
+         postal_http_reply_error(http, message, error);
          json_node_free(node);
          g_object_unref(device);
          soup_server_unpause_message(server, message);
@@ -645,7 +589,7 @@ devices_handler (UrlRouter         *router,
       postal_service_add_device(POSTAL_SERVICE_DEFAULT,
                                 device,
                                 NULL,
-                                devices_post_cb,
+                                postal_http_add_device_cb,
                                 g_object_ref(message));
       EXIT;
    }
@@ -657,28 +601,31 @@ devices_handler (UrlRouter         *router,
 }
 
 static void
-notify_post_handler_cb (GObject      *object,
-                        GAsyncResult *result,
-                        gpointer      user_data)
+postal_http_notify_cb (GObject      *object,
+                       GAsyncResult *result,
+                       gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    SoupMessage *message = user_data;
+   PostalHttp *http;
    GError *error = NULL;
 
    ENTRY;
 
-   g_return_if_fail(POSTAL_IS_SERVICE(service));
-   g_return_if_fail(SOUP_IS_MESSAGE(message));
+   g_assert(POSTAL_IS_SERVICE(service));
+   g_assert(SOUP_IS_MESSAGE(message));
+   http = g_object_get_data(user_data, "http");
+   g_assert(POSTAL_IS_HTTP(http));
 
    if (!postal_service_notify_finish(service, result, &error)) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       g_object_unref(message);
       EXIT;
    }
 
    soup_message_set_status(message, SOUP_STATUS_OK);
-   soup_server_unpause_message(gServer, message);
+   soup_server_unpause_message(http->priv->server, message);
    soup_message_headers_append(message->response_headers,
                                "Content-Type",
                                "application/json");
@@ -688,16 +635,19 @@ notify_post_handler_cb (GObject      *object,
 }
 
 static void
-notify_post_handler (SoupServer        *server,
-                     SoupMessage       *message,
-                     const gchar       *path,
-                     GHashTable        *query,
-                     SoupClientContext *client,
-                     gpointer           user_data)
+postal_http_handle_v1_notify (UrlRouter         *router,
+                              SoupServer        *server,
+                              SoupMessage       *message,
+                              const gchar       *path,
+                              GHashTable        *params,
+                              GHashTable        *query,
+                              SoupClientContext *client,
+                              gpointer           user_data)
 {
    PostalNotification *notif;
    MongoObjectId *oid;
    const gchar *str;
+   PostalHttp *http = user_data;
    JsonObject *aps;
    JsonObject *c2dm;
    JsonObject *gcm;
@@ -715,9 +665,17 @@ notify_post_handler (SoupServer        *server,
    g_assert(SOUP_IS_MESSAGE(message));
    g_assert(path);
    g_assert(client);
+   g_assert(POSTAL_IS_HTTP(http));
+
+   if (message->method != SOUP_METHOD_POST) {
+      soup_message_set_status(message, SOUP_STATUS_METHOD_NOT_ALLOWED);
+      return;
+   }
+
+   soup_server_pause_message(server, message);
 
    if (!(node = postal_http_parse_body(message, &error))) {
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       g_error_free(error);
       return;
    }
@@ -746,7 +704,7 @@ notify_post_handler (SoupServer        *server,
        !(devices = json_object_get_array_member(object, "devices"))) {
       error = g_error_new(postal_json_error_quark(), 0,
                           "Missing or invalid fields in JSON payload.");
-      postal_http_reply_error(message, error);
+      postal_http_reply_error(http, message, error);
       json_node_free(node);
       g_error_free(error);
       return;
@@ -787,7 +745,7 @@ notify_post_handler (SoupServer        *server,
                          (MongoObjectId **)devices_ptr->pdata,
                          devices_ptr->len,
                          NULL, /* TODO: Cancellable/Timeout? */
-                         notify_post_handler_cb,
+                         postal_http_notify_cb,
                          g_object_ref(message));
 
    g_ptr_array_unref(devices_ptr);
@@ -797,80 +755,228 @@ notify_post_handler (SoupServer        *server,
 }
 
 static void
-notify_handler (UrlRouter         *router,
-                SoupServer        *server,
-                SoupMessage       *message,
-                const gchar       *path,
-                GHashTable        *params,
-                GHashTable        *query,
-                SoupClientContext *client,
-                gpointer           user_data)
+postal_http_log_message (PostalHttp        *http,
+                         SoupMessage       *message,
+                         const gchar       *path,
+                         SoupClientContext *client)
 {
+   const gchar *ip_addr;
+   const gchar *version;
+   GTimeVal event_time;
+   struct tm tt;
+   time_t t;
+   gchar *epath;
+   gchar *formatted = NULL;
+   gchar *referrer;
+   gchar *user_agent;
+   gchar ftime[32];
+
+   g_assert(POSTAL_IS_HTTP(http));
+   g_assert(SOUP_IS_MESSAGE(message));
+   g_assert(client);
+
+   g_get_current_time(&event_time);
+   t = (time_t)event_time.tv_sec;
+   localtime_r(&t, &tt);
+   strftime(ftime, sizeof ftime, "%b %d %H:%M:%S", &tt);
+   ftime[31] = '\0';
+
+   switch (soup_message_get_http_version(message)) {
+   case SOUP_HTTP_1_0:
+      version = "HTTP/1.0";
+      break;
+   case SOUP_HTTP_1_1:
+      version = "HTTP/1.1";
+      break;
+   default:
+      g_assert_not_reached();
+      version = NULL;
+      break;
+   }
+
+   ip_addr = soup_client_context_get_host(client);
+   referrer = (gchar *)soup_message_headers_get_one(message->request_headers, "Referrer");
+   user_agent = (gchar *)soup_message_headers_get_one(message->request_headers, "User-Agent");
+
+   epath = g_strescape(path, NULL);
+   referrer = g_strescape(referrer ?: "", NULL);
+   user_agent = g_strescape(user_agent ?: "", NULL);
+
+   formatted = g_strdup_printf("%s %s \"%s %s %s\" %u %"G_GSIZE_FORMAT" \"%s\" \"%s\"\n",
+                               ip_addr,
+                               ftime,
+                               message->method,
+                               epath,
+                               version,
+                               message->status_code,
+                               message->response_body->length,
+                               referrer,
+                               user_agent);
+
+   neo_logger_log(http->priv->logger,
+                  &event_time,
+                  NULL,
+                  NULL,
+                  0,
+                  0,
+                  0,
+                  NULL,
+                  formatted);
+
+   g_free(epath);
+   g_free(referrer);
+   g_free(user_agent);
+   g_free(formatted);
+}
+
+static void
+postal_http_router (SoupServer        *server,
+                    SoupMessage       *message,
+                    const gchar       *path,
+                    GHashTable        *query,
+                    SoupClientContext *client,
+                    gpointer           user_data)
+{
+   PostalHttpPrivate *priv;
+   PostalHttp *http = user_data;
+
+   ENTRY;
+
    g_assert(SOUP_IS_SERVER(server));
    g_assert(SOUP_IS_MESSAGE(message));
    g_assert(path);
    g_assert(client);
+   g_assert(POSTAL_IS_HTTP(http));
 
-   if (message->method == SOUP_METHOD_POST) {
-      soup_server_pause_message(server, message);
-      notify_post_handler(server, message, path, params, client, user_data);
-   } else {
-      soup_message_set_status(message, SOUP_STATUS_METHOD_NOT_ALLOWED);
+   priv = http->priv;
+
+   g_object_set_data_full(G_OBJECT(message),
+                          "http",
+                          g_object_ref(http),
+                          g_object_unref);
+
+   if (!url_router_route(priv->router, server, message, path, query, client)) {
+      soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
+   }
+
+   EXIT;
+}
+
+static void
+postal_http_request_finished (SoupServer        *server,
+                              SoupMessage       *message,
+                              SoupClientContext *client,
+                              gpointer           user_data)
+{
+   const gchar *path;
+   PostalHttp *http = user_data;
+   SoupURI *uri;
+
+   g_assert(POSTAL_IS_HTTP(http));
+
+   if (message && (uri = soup_message_get_uri(message))) {
+      path = soup_uri_get_path(uri);
+      postal_http_log_message(http, message, path, client);
    }
 }
 
 static void
-request_finished (SoupServer        *server,
-                  SoupMessage       *message,
-                  SoupClientContext *client,
-                  gpointer           user_data)
+postal_http_start (NeoService *service)
 {
-   const gchar *path;
-   SoupURI *uri;
-
-   if (message && (uri = soup_message_get_uri(message))) {
-      path = soup_uri_get_path(uri);
-      postal_http_log_message(message, path, client);
-   }
-}
-
-void
-postal_http_init (GKeyFile *key_file)
-{
-   UrlRouter *router;
+   PostalHttpPrivate *priv;
+   GKeyFile *config;
    gboolean nologging = FALSE;
    gchar *logfile = NULL;
    guint port = 0;
 
-   if (key_file) {
-      port = g_key_file_get_integer(key_file, "http", "port", NULL);
-      logfile = g_key_file_get_string(key_file, "http", "logfile", NULL);
-      nologging = g_key_file_get_boolean(key_file, "http", "nologging", NULL);
+   ENTRY;
+
+   g_assert(POSTAL_IS_HTTP(service));
+
+   priv = POSTAL_HTTP(service)->priv;
+
+   config = neo_service_get_config(service);
+
+   if (config) {
+      port = g_key_file_get_integer(config, "http", "port", NULL);
+      logfile = g_key_file_get_string(config, "http", "logfile", NULL);
+      nologging = g_key_file_get_boolean(config, "http", "nologging", NULL);
    }
 
-   gServer = soup_server_new(SOUP_SERVER_PORT, port ?: 5300,
-                             SOUP_SERVER_SERVER_HEADER, "Postal/"VERSION,
-                             NULL);
+   priv->server = soup_server_new(SOUP_SERVER_PORT, port ?: 5300,
+                                  SOUP_SERVER_SERVER_HEADER, "Postal/"VERSION,
+                                  NULL);
+
    if (!nologging) {
       logfile = logfile ?: g_strdup("postal.log");
-      gLogger = neo_logger_daily_new(logfile);
-      g_signal_connect(gServer, "request-finished", G_CALLBACK(request_finished), NULL);
+      priv->logger = neo_logger_daily_new(logfile);
+      g_signal_connect(priv->server,
+                       "request-finished",
+                       G_CALLBACK(postal_http_request_finished),
+                       service);
    }
 
-   router = url_router_new();
-   url_router_add_handler(router,
+   url_router_add_handler(priv->router,
                           "/v1/users/:user/devices",
-                          devices_handler, NULL);
-   url_router_add_handler(router,
+                          postal_http_handle_v1_users_user_devices,
+                          service);
+   url_router_add_handler(priv->router,
                           "/v1/users/:user/devices/:device",
-                          device_handler, NULL);
-   url_router_add_handler(router,
+                          postal_http_handle_v1_users_user_devices_device,
+                          service);
+   url_router_add_handler(priv->router,
                           "/v1/notify",
-                          notify_handler, NULL);
+                          postal_http_handle_v1_notify,
+                          service);
 
-   soup_server_add_handler(gServer, NULL, postal_http_router,
-                           router, (GDestroyNotify)url_router_free);
-   soup_server_run_async(gServer);
+   soup_server_add_handler(priv->server,
+                           NULL,
+                           postal_http_router,
+                           service,
+                           NULL);
+
+   soup_server_run_async(priv->server);
 
    g_free(logfile);
+}
+
+static void
+postal_http_finalize (GObject *object)
+{
+   PostalHttpPrivate *priv;
+
+   priv = POSTAL_HTTP(object)->priv;
+
+   g_clear_object(&priv->logger);
+   g_clear_object(&priv->server);
+
+   url_router_free(priv->router);
+   priv->router = NULL;
+
+   G_OBJECT_CLASS(postal_http_parent_class)->finalize(object);
+}
+
+static void
+postal_http_class_init (PostalHttpClass *klass)
+{
+   GObjectClass *object_class;
+   NeoServiceClass *service_class;
+
+   object_class = G_OBJECT_CLASS(klass);
+   object_class->finalize = postal_http_finalize;
+   g_type_class_add_private(object_class, sizeof(PostalHttpPrivate));
+
+   service_class = NEO_SERVICE_CLASS(klass);
+   service_class->start = postal_http_start;
+}
+
+static void
+postal_http_init (PostalHttp *http)
+{
+   http->priv =
+      G_TYPE_INSTANCE_GET_PRIVATE(http,
+                                  POSTAL_TYPE_HTTP,
+                                  PostalHttpPrivate);
+   http->priv->router = url_router_new();
+   neo_service_set_name(NEO_SERVICE(http), "http");
 }
