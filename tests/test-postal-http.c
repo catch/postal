@@ -62,6 +62,7 @@ test1 (void)
    url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
+   g_free(url);
 
    soup_session_queue_message(session, message, get_devices_cb, NULL);
 
@@ -110,6 +111,7 @@ test2 (void)
    url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
    message = soup_message_new("POST", url);
    g_assert(SOUP_IS_MESSAGE(message));
+   g_free(url);
 
    soup_message_headers_set_content_type(message->request_headers,
                                          "application/json",
@@ -168,6 +170,7 @@ test3 (void)
    url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
+   g_free(url);
 
    soup_session_queue_message(session, message, get_devices2_cb, NULL);
 
