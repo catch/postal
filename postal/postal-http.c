@@ -916,19 +916,6 @@ postal_http_start (NeoService *service)
                        service);
    }
 
-   url_router_add_handler(priv->router,
-                          "/v1/users/:user/devices",
-                          postal_http_handle_v1_users_user_devices,
-                          service);
-   url_router_add_handler(priv->router,
-                          "/v1/users/:user/devices/:device",
-                          postal_http_handle_v1_users_user_devices_device,
-                          service);
-   url_router_add_handler(priv->router,
-                          "/v1/notify",
-                          postal_http_handle_v1_notify,
-                          service);
-
    soup_server_add_handler(priv->server,
                            NULL,
                            postal_http_router,
@@ -977,6 +964,20 @@ postal_http_init (PostalHttp *http)
       G_TYPE_INSTANCE_GET_PRIVATE(http,
                                   POSTAL_TYPE_HTTP,
                                   PostalHttpPrivate);
-   http->priv->router = url_router_new();
+
    neo_service_set_name(NEO_SERVICE(http), "http");
+
+   http->priv->router = url_router_new();
+   url_router_add_handler(http->priv->router,
+                          "/v1/users/:user/devices",
+                          postal_http_handle_v1_users_user_devices,
+                          http);
+   url_router_add_handler(http->priv->router,
+                          "/v1/users/:user/devices/:device",
+                          postal_http_handle_v1_users_user_devices_device,
+                          http);
+   url_router_add_handler(http->priv->router,
+                          "/v1/notify",
+                          postal_http_handle_v1_notify,
+                          http);
 }
