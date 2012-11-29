@@ -1,15 +1,21 @@
 noinst_PROGRAMS =
 noinst_PROGRAMS += test-postal-device
+noinst_PROGRAMS += test-postal-http
 noinst_PROGRAMS += test-postal-service
 noinst_PROGRAMS += test-url-router
 
 TEST_PROGS += test-postal-device
+TEST_PROGS += test-postal-http
 TEST_PROGS += test-postal-service
 TEST_PROGS += test-url-router
 
 test_postal_device_SOURCES = tests/test-postal-device.c
 test_postal_device_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib
 test_postal_device_LDADD = libpostal.la
+
+test_postal_http_SOURCES = tests/test-postal-http.c
+test_postal_http_CPPFLAGS = -I$(top_srcdir) $(GIO_CFLAGS) $(JSON_CFLAGS) $(SOUP_CFLAGS)
+test_postal_http_LDADD = libpostal.la
 
 test_postal_service_SOURCES = tests/test-postal-service.c
 test_postal_service_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib

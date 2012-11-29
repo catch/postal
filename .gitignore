@@ -26,5 +26,6 @@ postald
 stamp-h1
 *.swp
 test-postal-device
+test-postal-http
 test-postal-service
 test-url-router
