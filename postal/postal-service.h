@@ -80,7 +80,7 @@ void           postal_service_find_devices         (PostalService        *servic
                                                     GCancellable         *cancellable,
                                                     GAsyncReadyCallback   callback,
                                                     gpointer              user_data);
-GList         *postal_service_find_devices_finish  (PostalService        *service,
+GPtrArray     *postal_service_find_devices_finish  (PostalService        *service,
                                                     GAsyncResult         *result,
                                                     GError              **error);
 void           postal_service_remove_device        (PostalService        *service,

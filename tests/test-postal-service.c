@@ -13,38 +13,25 @@ test1_cb3 (GObject      *object,
            GAsyncResult *result,
            gpointer      user_data)
 {
-   MongoObjectId *oo;
    PostalService *service = (PostalService *)object;
    PostalDevice *device = user_data;
-   MongoBsonIter i = { 0 };
-   MongoBson *b;
+   GPtrArray *devices;
    GError *error = NULL;
-   GList *list;
-   gchar *s;
+   guint i;
 
-   list = postal_service_find_devices_finish(service, result, &error);
+   devices = postal_service_find_devices_finish(service, result, &error);
    g_assert_no_error(error);
-   g_assert(list);
+   g_assert(devices);
 
-   for (; list; list = list->next) {
-      g_assert(mongo_bson_iter_init_find(&i, list->data, "device_token"));
-      s = (gchar *)mongo_bson_iter_get_value_string(&i, NULL);
-      if (!g_strcmp0(s, postal_device_get_device_token(device))) {
+   for (i = 0; i < devices->len; i++) {
+      if (!g_strcmp0(postal_device_get_device_token(device),
+                     postal_device_get_device_token(g_ptr_array_index(devices, i)))) {
          break;
       }
    }
 
-   g_assert(list);
-   b = list->data;
-   s = (gchar *)mongo_bson_iter_get_value_string(&i, NULL);
-   g_assert_cmpstr(postal_device_get_device_token(device), ==, s);
-   g_assert(mongo_bson_iter_init_find(&i, b, "user"));
-   g_assert(mongo_bson_iter_get_value_type(&i) == MONGO_BSON_OBJECT_ID);
-   oo = mongo_bson_iter_get_value_object_id(&i);
-   s = mongo_object_id_to_string(oo);
-   g_assert_cmpstr(s, ==, postal_device_get_user(device));
-   mongo_object_id_free(oo);
-   g_free(s);
+   g_assert_cmpint(i, <, devices->len);
+   g_assert_cmpstr(postal_device_get_user(device), ==, postal_device_get_user(g_ptr_array_index(devices, i)));
 
    gSuccess = TRUE;
    g_main_loop_quit(gMainLoop);

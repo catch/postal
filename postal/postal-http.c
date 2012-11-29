@@ -179,25 +179,28 @@ postal_http_parse_body (SoupMessage  *message,
 }
 
 static void
-postal_http_reply_bson_list (SoupMessage *message,
-                             guint        status,
-                             GList       *list)
+postal_http_reply_devices (SoupMessage *message,
+                           guint        status,
+                           GPtrArray   *devices)
 {
    JsonGenerator *g;
+   PostalDevice *device;
    JsonArray *ar;
    JsonNode *node;
    JsonNode *child;
-   GList *iter;
    gchar *json_buf;
    gsize length;
+   guint i;
 
    g_assert(SOUP_IS_MESSAGE(message));
+   g_assert(devices);
 
    ar = json_array_new();
    node = json_node_new(JSON_NODE_ARRAY);
 
-   for (iter = list; iter; iter = iter->next) {
-      if ((child = postal_bson_to_json(iter->data))) {
+   for (i = 0; i < devices->len; i++) {
+      device = g_ptr_array_index(devices, i);
+      if ((child = postal_device_save_to_json(device, NULL))) {
          json_array_add_element(ar, child);
       }
    }
@@ -546,24 +549,23 @@ devices_get_cb (GObject      *object,
 {
    PostalService *service = (PostalService *)object;
    SoupMessage *message = user_data;
+   GPtrArray *devices;
    GError *error = NULL;
-   GList *list;
 
    ENTRY;
 
    g_assert(POSTAL_IS_SERVICE(service));
 
-   list = postal_service_find_devices_finish(service, result, &error);
-   if (!list && error) {
+   if (!(devices = postal_service_find_devices_finish(service,
+                                                      result,
+                                                      &error))) {
       postal_http_reply_error(message, error);
       g_error_free(error);
       GOTO(failure);
-   } else {
-      postal_http_reply_bson_list(message, SOUP_STATUS_OK, list);
    }
 
-   g_list_foreach(list, (GFunc)mongo_bson_unref, NULL);
-   g_list_free(list);
+   postal_http_reply_devices(message, SOUP_STATUS_OK, devices);
+   g_ptr_array_unref(devices);
 
 failure:
    g_object_unref(message);

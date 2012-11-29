@@ -66,6 +66,9 @@ const gchar  *postal_device_get_user         (PostalDevice  *device);
 const gchar  *postal_device_get_device_token (PostalDevice  *device);
 const gchar  *postal_device_get_device_type  (PostalDevice  *device);
 GType         postal_device_get_type         (void) G_GNUC_CONST;
+gboolean      postal_device_load_from_bson   (PostalDevice  *device,
+                                              MongoBson     *bson,
+                                              GError       **error);
 gboolean      postal_device_load_from_json   (PostalDevice  *device,
                                               JsonNode      *node,
                                               GError       **error);

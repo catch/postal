@@ -154,6 +154,50 @@ postal_device_set_device_type (PostalDevice *device,
    g_object_notify_by_pspec(G_OBJECT(device), gParamSpecs[PROP_DEVICE_TYPE]);
 }
 
+gboolean
+postal_device_load_from_bson (PostalDevice  *device,
+                              MongoBson     *bson,
+                              GError       **error)
+{
+   PostalDevicePrivate *priv;
+   MongoObjectId *oid;
+   MongoBsonIter iter;
+   const gchar *str;
+   gchar oidstr[25];
+
+   ENTRY;
+
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), FALSE);
+   g_return_val_if_fail(bson, FALSE);
+
+   priv = device->priv;
+
+   mongo_bson_iter_init(&iter, bson);
+   while (mongo_bson_iter_next(&iter)) {
+      if (mongo_bson_iter_is_key(&iter, "device_type")) {
+         str = mongo_bson_iter_get_value_string(&iter, NULL);
+         postal_device_set_device_type(device, str);
+      } else if (mongo_bson_iter_is_key(&iter, "device_token")) {
+         str = mongo_bson_iter_get_value_string(&iter, NULL);
+         postal_device_set_device_token(device, str);
+      } else if (mongo_bson_iter_is_key(&iter, "user")) {
+         if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_UTF8) {
+            str = mongo_bson_iter_get_value_string(&iter, NULL);
+            postal_device_set_user(device, str);
+         } else if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_OBJECT_ID) {
+            oid = mongo_bson_iter_get_value_object_id(&iter);
+            mongo_object_id_to_string_r(oid, oidstr);
+            postal_device_set_user(device, oidstr);
+            mongo_object_id_free(oid);
+         }
+      }
+   }
+
+   RETURN(priv->device_type &&
+          priv->device_token &&
+          priv->user);
+}
+
 /**
  * postal_device_save_to_bson:
  * @device: (in): A #PostalDevice.

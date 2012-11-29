@@ -441,7 +441,9 @@ postal_service_find_devices_foreach (MongoCursor *cursor,
                                      MongoBson   *bson,
                                      gpointer     user_data)
 {
+   PostalDevice *device;
    GPtrArray *devices = user_data;
+   GError *error = NULL;
 
    ENTRY;
 
@@ -449,7 +451,15 @@ postal_service_find_devices_foreach (MongoCursor *cursor,
    g_return_val_if_fail(bson, TRUE);
    g_return_val_if_fail(devices, TRUE);
 
-   g_ptr_array_add(devices, mongo_bson_ref(bson));
+   device = postal_device_new();
+
+   if (!postal_device_load_from_bson(device, bson, &error)) {
+      g_message("Failed to load device from BSON: %s", error->message);
+      g_object_unref(device);
+      RETURN(TRUE);
+   }
+
+   g_ptr_array_add(devices, device);
 
    RETURN(TRUE);
 }
@@ -516,7 +526,7 @@ postal_service_find_devices (PostalService       *service,
                                       postal_service_find_devices);
    g_simple_async_result_set_check_cancellable(simple, cancellable);
 
-   devices = g_ptr_array_new_with_free_func((GDestroyNotify)mongo_bson_unref);
+   devices = g_ptr_array_new_with_free_func(g_object_unref);
    g_simple_async_result_set_op_res_gpointer(simple, devices,
                                              (GDestroyNotify)g_ptr_array_unref);
 
@@ -541,27 +551,20 @@ postal_service_find_devices (PostalService       *service,
  * @error: (out): A location for a #GError, or %NULL.
  *
  * Completes an asynchronous request to postal_service_find_devices().
- * The resulting #GList of #MongoBson is owned by the caller and should be
- * freed using the following:
+ * The result is a #GPtrArray of #PostalDevice instances. The resulting
+ * #GPtrArray should be released using g_ptr_array_unref() when you are
+ * finished.
  *
- * <informalexample>
- *   <programlisting>
- * g_list_foreach(list, (GFunc)mongo_bson_unref, NULL);
- * g_list_free(list);
- *   </programlisting>
- * </informalexample>
- *
- * Returns: (transfer full) (element-type MongoBson*): A #GList of #MongoBson.
+ * Returns: (transfer container) (element-type PostalDevice*):
+ *   A #GList of #PostalDevice.
  */
-GList *
+GPtrArray *
 postal_service_find_devices_finish (PostalService  *service,
                                     GAsyncResult   *result,
                                     GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
    GPtrArray *devices;
-   GList *list = NULL;
-   guint i;
 
    ENTRY;
 
@@ -573,14 +576,7 @@ postal_service_find_devices_finish (PostalService  *service,
       RETURN(NULL);
    }
 
-   for (i = 0; i < devices->len; i++) {
-      list = g_list_prepend(list,
-                            mongo_bson_ref(g_ptr_array_index(devices, i)));
-   }
-
-   list = g_list_reverse(list);
-
-   RETURN(list);
+   RETURN(devices);
 }
 
 static void
