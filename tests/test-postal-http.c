@@ -6,6 +6,7 @@ static PostalApplication *gApplication;
 static GKeyFile          *gKeyFile;
 static gchar             *gAccount;
 static gchar             *gC2dmDevice;
+static gint               gC2dmDeviceId;
 static const gchar       *gConfig =
    "[mongo]\n"
    "db = test\n"
@@ -74,11 +75,22 @@ add_device_cb (SoupSession *session,
                SoupMessage *message,
                gpointer     user_data)
 {
+   gchar *str;
+
    g_assert(SOUP_IS_SESSION(session));
    g_assert(SOUP_IS_MESSAGE(message));
 
    g_assert_cmpint(message->status_code, ==, 201);
-   g_assert_cmpstr(message->response_body->data, ==, "[\n]");
+
+   str = g_strdup_printf("{\n"
+                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_type\" : \"c2dm\",\n"
+                         "  \"user\" : \"%s\"\n"
+                         "}",
+                         gC2dmDeviceId,
+                         gAccount);
+   g_assert_cmpstr(message->response_body->data, ==, str);
+   g_free(str);
 
    g_application_quit(G_APPLICATION(gApplication));
 }
@@ -126,14 +138,14 @@ main (gint argc,
 
    gAccount = g_strdup_printf("%024d", g_random_int());
 
+   gC2dmDeviceId = g_random_int();
    gC2dmDevice = g_strdup_printf("{\n"
                                  "  \"device_token\": \"%064d\",\n"
                                  "  \"device_type\": \"c2dm\"\n"
-                                 "}", g_random_int());
+                                 "}", gC2dmDeviceId);
 
    g_test_add_func("/PostalHttp/get_devices", test1);
-
-   if (0) g_test_add_func("/PostalHttp/add_device", test2);
+   g_test_add_func("/PostalHttp/add_device", test2);
 
    return g_test_run();
 }
