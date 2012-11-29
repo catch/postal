@@ -24,7 +24,6 @@
 #include <json-glib/json-glib.h>
 
 #include "neo-logger-daily.h"
-#include "postal-bson.h"
 #include "postal-debug.h"
 #include "postal-http.h"
 #include "postal-service.h"
@@ -225,36 +224,6 @@ postal_http_reply_devices (SoupMessage *message,
    soup_server_unpause_message(gServer, message);
 }
 
-static void
-postal_http_reply_bson (SoupMessage     *message,
-                        guint            status,
-                        const MongoBson *bson)
-{
-   JsonGenerator *g;
-   JsonNode *node;
-   gchar *json_buf;
-   gsize length;
-
-   g_assert(SOUP_IS_MESSAGE(message));
-
-   g = json_generator_new();
-   node = postal_bson_to_json(bson);
-   json_generator_set_root(g, node);
-   json_node_free(node);
-   json_generator_set_indent(g, 2);
-   json_generator_set_pretty(g, TRUE);
-   json_buf = json_generator_to_data(g, &length);
-   g_object_unref(g);
-
-   soup_message_set_response(message,
-                             "application/json",
-                             SOUP_MEMORY_TAKE,
-                             json_buf,
-                             length);
-   soup_message_set_status(message, status ?: SOUP_STATUS_OK);
-   soup_server_unpause_message(gServer, message);
-}
-
 static guint
 get_status_code (const GError *error)
 {
@@ -369,8 +338,8 @@ device_cb (GObject      *object,
            gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
+   PostalDevice *device;
    SoupMessage *message = user_data;
-   MongoBson *bson;
    GError *error = NULL;
 
    ENTRY;
@@ -378,14 +347,14 @@ device_cb (GObject      *object,
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
 
-   if (!(bson = postal_service_find_device_finish(service, result, &error))) {
+   if (!(device = postal_service_find_device_finish(service, result, &error))) {
       postal_http_reply_error(message, error);
       g_error_free(error);
       GOTO(failure);
-   } else {
-      postal_http_reply_bson(message, SOUP_STATUS_OK, bson);
-      mongo_bson_unref(bson);
    }
+
+   postal_http_reply_device(message, SOUP_STATUS_OK, device);
+   g_object_unref(device);
 
 failure:
    g_object_unref(message);

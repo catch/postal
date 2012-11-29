@@ -70,7 +70,7 @@ void           postal_service_find_device          (PostalService        *servic
                                                     GCancellable         *cancellable,
                                                     GAsyncReadyCallback   callback,
                                                     gpointer              user_data);
-MongoBson     *postal_service_find_device_finish   (PostalService        *service,
+PostalDevice  *postal_service_find_device_finish   (PostalService        *service,
                                                     GAsyncResult         *result,
                                                     GError              **error);
 void           postal_service_find_devices         (PostalService        *service,

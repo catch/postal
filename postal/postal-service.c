@@ -587,8 +587,9 @@ postal_service_find_device_cb (GObject      *object,
    GSimpleAsyncResult *simple = user_data;
    MongoMessageReply *reply;
    MongoConnection *connection = (MongoConnection *)object;
+   PostalDevice *device;
    GError *error = NULL;
-   GList *list;
+   GList *list = NULL;
 
    ENTRY;
 
@@ -602,8 +603,13 @@ postal_service_find_device_cb (GObject      *object,
    }
 
    if ((list = mongo_message_reply_get_documents(reply))) {
-      g_simple_async_result_set_op_res_gpointer(simple, mongo_bson_ref(list->data),
-                                                (GDestroyNotify)mongo_bson_unref);
+      device = postal_device_new();
+      if (!postal_device_load_from_bson(device, list->data, &error)) {
+         g_simple_async_result_take_error(simple, error);
+         g_object_unref(device);
+         GOTO(failure);
+      }
+      g_simple_async_result_set_op_res_gpointer(simple, device, g_object_unref);
    } else {
       g_simple_async_result_set_error(simple,
                                       POSTAL_DEVICE_ERROR,
@@ -614,6 +620,8 @@ postal_service_find_device_cb (GObject      *object,
 failure:
    g_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
+   g_list_foreach(list, (GFunc)mongo_bson_unref, NULL);
+   g_list_free(list);
 
    EXIT;
 }
@@ -670,13 +678,13 @@ postal_service_find_device (PostalService       *service,
    EXIT;
 }
 
-MongoBson *
+PostalDevice *
 postal_service_find_device_finish (PostalService  *service,
                                    GAsyncResult   *result,
                                    GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
-   MongoBson *ret;
+   PostalDevice *ret;
 
    ENTRY;
 
@@ -686,7 +694,7 @@ postal_service_find_device_finish (PostalService  *service,
    if (!(ret = g_simple_async_result_get_op_res_gpointer(simple))) {
       g_simple_async_result_propagate_error(simple, error);
    } else {
-      ret = mongo_bson_ref(ret);
+      ret = g_object_ref(ret);
    }
 
    RETURN(ret);
