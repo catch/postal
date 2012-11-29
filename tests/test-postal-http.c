@@ -65,6 +65,8 @@ test1 (void)
    soup_session_queue_message(session, message, get_devices_cb, NULL);
 
    g_application_run(G_APPLICATION(gApplication), 0, NULL);
+
+   g_clear_object(&gApplication);
 }
 
 static void
@@ -108,6 +110,8 @@ test2 (void)
    soup_session_queue_message(session, message, add_device_cb, NULL);
 
    g_application_run(G_APPLICATION(gApplication), 0, NULL);
+
+   g_clear_object(&gApplication);
 }
 
 gint
