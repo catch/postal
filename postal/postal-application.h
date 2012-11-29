@@ -24,6 +24,7 @@
 G_BEGIN_DECLS
 
 #define POSTAL_TYPE_APPLICATION            (postal_application_get_type())
+#define POSTAL_APPLICATION_DEFAULT         (postal_application_get_default())
 #define POSTAL_APPLICATION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_APPLICATION, PostalApplication))
 #define POSTAL_APPLICATION_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_APPLICATION, PostalApplication const))
 #define POSTAL_APPLICATION_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  POSTAL_TYPE_APPLICATION, PostalApplicationClass))
@@ -48,7 +49,8 @@ struct _PostalApplicationClass
    GApplicationClass parent_class;
 };
 
-GType postal_application_get_type (void) G_GNUC_CONST;
+PostalApplication *postal_application_get_default (void);
+GType              postal_application_get_type    (void) G_GNUC_CONST;
 
 G_END_DECLS
 

@@ -41,8 +41,106 @@
 
 G_DEFINE_TYPE(PostalApplication, postal_application, G_TYPE_APPLICATION)
 
-static NeoLogger *gLoggerStdout;
-static guint      gPid;
+struct _PostalApplicationPrivate
+{
+   gboolean  activated;
+   GKeyFile *config;
+};
+
+enum
+{
+   PROP_0,
+   PROP_CONFIG,
+   LAST_PROP
+};
+
+static NeoLogger  *gLoggerStdout;
+static guint       gPid;
+static GParamSpec *gParamSpecs[LAST_PROP];
+
+PostalApplication *
+postal_application_get_default (void)
+{
+   static PostalApplication *application = NULL;
+
+   if (g_once_init_enter(&application)) {
+      GApplicationFlags flags;
+      PostalApplication *app;
+
+      flags = G_APPLICATION_HANDLES_COMMAND_LINE;
+      flags |= G_APPLICATION_NON_UNIQUE;
+      app = g_object_new(POSTAL_TYPE_APPLICATION,
+                         "application-id", "com.catch.postald",
+                         "flags", flags,
+                         NULL);
+      g_object_add_weak_pointer(G_OBJECT(app), (gpointer *)&application);
+      g_once_init_leave(&application, app);
+   }
+
+   return application;
+}
+
+GKeyFile *
+postal_application_get_config (PostalApplication *application)
+{
+   g_return_val_if_fail(POSTAL_IS_APPLICATION(application), NULL);
+   return application->priv->config;
+}
+
+void
+postal_application_set_config (PostalApplication *application,
+                               GKeyFile          *config)
+{
+   PostalApplicationPrivate *priv;
+
+   g_return_if_fail(POSTAL_IS_APPLICATION(application));
+
+   priv = application->priv;
+
+   if (priv->config) {
+      g_key_file_unref(priv->config);
+      priv->config = NULL;
+   }
+
+   if (config) {
+      priv->config = g_key_file_ref(config);
+   }
+
+   g_object_notify_by_pspec(G_OBJECT(application), gParamSpecs[PROP_CONFIG]);
+}
+
+static void
+postal_application_activate (GApplication *application)
+{
+   PostalApplicationPrivate *priv;
+
+   ENTRY;
+
+   g_assert(G_IS_APPLICATION(application));
+
+   priv = POSTAL_APPLICATION(application)->priv;
+
+   if (priv->activated || g_application_get_is_remote(application)) {
+      EXIT;
+   }
+
+   /*
+    * TODO: I'd like service, http, redis to be services of the application.
+    */
+
+   priv->activated = TRUE;
+   g_object_set(POSTAL_SERVICE_DEFAULT,
+                "config", priv->config,
+                NULL);
+   postal_http_init(priv->config);
+#ifdef ENABLE_REDIS
+   postal_redis_init(priv->config);
+#endif
+
+   g_application_hold(application);
+
+   EXIT;
+}
 
 /**
  * postal_application_command_line:
@@ -70,6 +168,8 @@ postal_application_command_line (GApplication            *application,
    gint argc;
    gint ret = EXIT_SUCCESS;
 
+   ENTRY;
+
    g_assert(G_IS_APPLICATION(application));
    g_assert(G_IS_APPLICATION_COMMAND_LINE(command_line));
 
@@ -85,7 +185,7 @@ postal_application_command_line (GApplication            *application,
    if (!g_option_context_parse(context, &argc, &argv, &error)) {
       g_application_command_line_printerr(command_line, "%s\n", error->message);
       ret = EXIT_FAILURE;
-      goto cleanup;
+      GOTO(cleanup);
    }
 
    /*
@@ -103,49 +203,32 @@ postal_application_command_line (GApplication            *application,
 
       if (config) {
          key_file = g_key_file_new();
-         if (!g_key_file_load_from_file(key_file,
-                                        config,
-                                        G_KEY_FILE_NONE,
-                                        &error)) {
+         if (!g_key_file_load_from_file(key_file, config, 0, &error)) {
             g_application_command_line_printerr(
                   command_line,
                   _("Failed to parse config (%s): %s\n"),
                   config, error->message);
             g_key_file_unref(key_file);
-            goto cleanup;
+            GOTO(cleanup);
          }
-         g_object_set(POSTAL_SERVICE_DEFAULT,
-                      "config", key_file,
-                      NULL);
+         postal_application_set_config(POSTAL_APPLICATION(application),
+                                       key_file);
       }
 
-      /*
-       * Initialize subsystems.
-       */
-      postal_service_start(POSTAL_SERVICE_DEFAULT);
-      postal_http_init(key_file);
-#ifdef ENABLE_REDIS
-      postal_redis_init(key_file);
-#endif
-
-      /*
-       * Take reference to application so
-       * that it doesn't return immediately.
-       */
-      g_application_hold(application);
+      g_application_activate(application);
    }
 
 cleanup:
    if (key_file) {
       g_key_file_unref(key_file);
    }
+
    g_option_context_free(context);
    g_clear_error(&error);
    g_strfreev(argv);
    g_free(config);
-   config = NULL;
 
-   return ret;
+   RETURN(ret);
 }
 
 static inline guint
@@ -217,17 +300,75 @@ postal_application_log_handler (const gchar    *log_domain,
 }
 
 static void
+postal_application_get_property (GObject    *object,
+                                 guint       prop_id,
+                                 GValue     *value,
+                                 GParamSpec *pspec)
+{
+   PostalApplication *application = POSTAL_APPLICATION(object);
+
+   switch (prop_id) {
+   case PROP_CONFIG:
+      g_value_set_boxed(value, postal_application_get_config(application));
+      break;
+   default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+   }
+}
+
+static void
+postal_application_set_property (GObject      *object,
+                                 guint         prop_id,
+                                 const GValue *value,
+                                 GParamSpec   *pspec)
+{
+   PostalApplication *application = POSTAL_APPLICATION(object);
+
+   switch (prop_id) {
+   case PROP_CONFIG:
+      postal_application_set_config(application, g_value_get_boxed(value));
+      break;
+   default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+   }
+}
+
+static void
 postal_application_class_init (PostalApplicationClass *klass)
 {
    GApplicationClass *application_class;
+   GObjectClass *object_class;
+
+   object_class = G_OBJECT_CLASS(klass);
+   object_class->get_property = postal_application_get_property;
+   object_class->set_property = postal_application_set_property;
+   g_type_class_add_private(klass, sizeof(PostalApplicationPrivate));
 
    application_class = G_APPLICATION_CLASS(klass);
+   application_class->activate = postal_application_activate;
    application_class->command_line = postal_application_command_line;
+
+   gParamSpecs[PROP_CONFIG] =
+      g_param_spec_boxed("config",
+                         _("Config"),
+                         _("The application configuration."),
+                         G_TYPE_KEY_FILE,
+                         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_CONFIG,
+                                   gParamSpecs[PROP_CONFIG]);
 }
 
 static void
 postal_application_init (PostalApplication *application)
 {
+   application->priv = G_TYPE_INSTANCE_GET_PRIVATE(application,
+                                                   POSTAL_TYPE_APPLICATION,
+                                                   PostalApplicationPrivate);
+
+   /*
+    * TODO: Move these to instance variables.
+    */
+
    gPid = getpid();
    gLoggerStdout = neo_logger_unix_new(STDOUT_FILENO, FALSE);
    g_log_set_default_handler(postal_application_log_handler, NULL);
