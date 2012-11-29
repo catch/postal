@@ -340,12 +340,38 @@ postal_application_set_property (GObject      *object,
 }
 
 static void
+postal_application_finalize (GObject *object)
+{
+   PostalApplicationPrivate *priv;
+
+   ENTRY;
+
+   priv = POSTAL_APPLICATION(object)->priv;
+
+   if (priv->http && neo_service_get_is_running(NEO_SERVICE(priv->http))) {
+      neo_service_stop(NEO_SERVICE(priv->http));
+   }
+
+   g_clear_object(&priv->http);
+
+   if (priv->config) {
+      g_key_file_unref(priv->config);
+      priv->config = NULL;
+   }
+
+   G_OBJECT_CLASS(postal_application_parent_class)->finalize(object);
+
+   EXIT;
+}
+
+static void
 postal_application_class_init (PostalApplicationClass *klass)
 {
    GApplicationClass *application_class;
    GObjectClass *object_class;
 
    object_class = G_OBJECT_CLASS(klass);
+   object_class->finalize = postal_application_finalize;
    object_class->get_property = postal_application_get_property;
    object_class->set_property = postal_application_set_property;
    g_type_class_add_private(klass, sizeof(PostalApplicationPrivate));
