@@ -229,6 +229,64 @@ test4 (void)
 }
 
 static void
+put_cb (SoupSession *session,
+        SoupMessage *message,
+        gpointer     user_data)
+{
+   gchar *str;
+
+   g_assert(SOUP_IS_SESSION(session));
+   g_assert(SOUP_IS_MESSAGE(message));
+
+   g_assert_cmpint(message->status_code, ==, 200);
+
+   str = g_strdup_printf("{\n"
+                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_type\" : \"gcm\",\n"
+                         "  \"user\" : \"%s\"\n"
+                         "}",
+                         gC2dmDeviceId,
+                         gAccount);
+   g_assert_cmpstr(message->response_body->data, ==, str);
+   g_free(str);
+
+   g_application_quit(G_APPLICATION(gApplication));
+}
+
+static void
+test5 (void)
+{
+   SoupSession *session;
+   SoupMessage *message;
+   gchar *url;
+   gchar *str;
+
+   gApplication = application_new(G_STRFUNC);
+
+   session = soup_session_async_new();
+   g_assert(SOUP_IS_SESSION(session));
+
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064d", gAccount, gC2dmDeviceId);
+   message = soup_message_new("PUT", url);
+   g_assert(SOUP_IS_MESSAGE(message));
+   g_free(url);
+
+   str = g_strdup_printf("{\n"
+                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_type\" : \"gcm\"\n"
+                         "}",
+                         gC2dmDeviceId);
+   soup_message_headers_set_content_type(message->request_headers, "application/json", NULL);
+   soup_message_body_append_take(message->request_body, (guint8 *)str, strlen(str));
+
+   soup_session_queue_message(session, message, put_cb, NULL);
+
+   g_application_run(G_APPLICATION(gApplication), 0, NULL);
+
+   g_clear_object(&gApplication);
+}
+
+static void
 delete_cb (SoupSession *session,
            SoupMessage *message,
            gpointer     user_data)
@@ -243,7 +301,7 @@ delete_cb (SoupSession *session,
 }
 
 static void
-test5 (void)
+test6 (void)
 {
    SoupSession *session;
    SoupMessage *message;
@@ -288,7 +346,8 @@ main (gint argc,
    g_test_add_func("/PostalHttp/add_device", test2);
    g_test_add_func("/PostalHttp/get_devices2", test3);
    g_test_add_func("/PostalHttp/get_device", test4);
-   g_test_add_func("/PostalHttp/remove_device", test5);
+   g_test_add_func("/PostalHttp/update_device", test5);
+   g_test_add_func("/PostalHttp/remove_device", test6);
 
    return g_test_run();
 }
