@@ -25,17 +25,18 @@ G_DEFINE_TYPE(PostalDevice, postal_device, G_TYPE_OBJECT)
 
 struct _PostalDevicePrivate
 {
-   gchar *user;
-   gchar *device_token;
-   gchar *device_type;
+   gchar    *device_token;
+   gchar    *device_type;
+   GTimeVal  removed_at;
+   gchar    *user;
 };
 
 enum
 {
    PROP_0,
-   PROP_USER,
    PROP_DEVICE_TOKEN,
    PROP_DEVICE_TYPE,
+   PROP_USER,
    LAST_PROP
 };
 
@@ -52,6 +53,55 @@ PostalDevice *
 postal_device_new (void)
 {
    return g_object_new(POSTAL_TYPE_DEVICE, NULL);
+}
+
+/**
+ * postal_device_get_removed_at:
+ * @device: (in): A #PostalDevice.
+ *
+ * Fetches a #GTimeVal of when the device was removed or %NULL if it has not
+ * been removed.
+ *
+ * Returns: (transfer none): A #GTimeVal that should not be modified.
+ */
+GTimeVal *
+postal_device_get_removed_at (PostalDevice *device)
+{
+   PostalDevicePrivate *priv;
+
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
+
+   priv = device->priv;
+
+   if (!priv->removed_at.tv_sec && !priv->removed_at.tv_usec) {
+      return NULL;
+   }
+
+   return &device->priv->removed_at;
+}
+
+/**
+ * postal_device_set_removed_at:
+ * @device: (in): A #PostalDevice.
+ * @removed_at: (in) (allow-none): A #GTimeVal.
+ *
+ * Sets the :removed-at property.
+ */
+void
+postal_device_set_removed_at (PostalDevice *device,
+                              GTimeVal     *removed_at)
+{
+   PostalDevicePrivate *priv;
+
+   g_return_if_fail(POSTAL_IS_DEVICE(device));
+
+   priv = device->priv;
+
+   if (removed_at) {
+      priv->removed_at = *removed_at;
+   } else {
+      memset(&priv->removed_at, 0, sizeof priv->removed_at);
+   }
 }
 
 /**
@@ -164,6 +214,7 @@ postal_device_load_from_bson (PostalDevice  *device,
    MongoBsonIter iter;
    const gchar *str;
    gchar oidstr[25];
+   GTimeVal tv;
 
    ENTRY;
 
@@ -180,6 +231,13 @@ postal_device_load_from_bson (PostalDevice  *device,
       } else if (mongo_bson_iter_is_key(&iter, "device_token")) {
          str = mongo_bson_iter_get_value_string(&iter, NULL);
          postal_device_set_device_token(device, str);
+      } else if (mongo_bson_iter_is_key(&iter, "removed_at")) {
+         if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_DATE_TIME) {
+            mongo_bson_iter_get_value_timeval(&iter, &tv);
+            postal_device_set_removed_at(device, &tv);
+         } else if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_NULL) {
+            postal_device_set_removed_at(device, NULL);
+         }
       } else if (mongo_bson_iter_is_key(&iter, "user")) {
          if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_UTF8) {
             str = mongo_bson_iter_get_value_string(&iter, NULL);
@@ -248,6 +306,8 @@ postal_device_save_to_bson (PostalDevice  *device,
       mongo_bson_append_string(ret, "user", priv->user);
    }
 
+   mongo_bson_append_timeval(ret, "removed_at", &priv->removed_at);
+
    RETURN(ret);
 }
 
@@ -258,6 +318,7 @@ postal_device_save_to_json (PostalDevice  *device,
    PostalDevicePrivate *priv;
    JsonObject *obj;
    JsonNode *node;
+   gchar *str;
 
    g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
 
@@ -283,8 +344,16 @@ postal_device_save_to_json (PostalDevice  *device,
       json_object_set_null_member(obj, "user");
    }
 
+   if (priv->removed_at.tv_sec || priv->removed_at.tv_usec) {
+      str = g_time_val_to_iso8601(&priv->removed_at);
+      json_object_set_string_member(obj, "removed_at", str);
+      g_free(str);
+   } else {
+      json_object_set_null_member(obj, "removed_at");
+   }
+
    /*
-    * TODO: removed_at, created_at, etc.
+    * TODO: created_at, etc.
     */
 
    node = json_node_new(JSON_NODE_OBJECT);

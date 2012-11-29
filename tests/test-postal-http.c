@@ -86,7 +86,8 @@ add_device_cb (SoupSession *session,
    str = g_strdup_printf("{\n"
                          "  \"device_token\" : \"%064d\",\n"
                          "  \"device_type\" : \"c2dm\",\n"
-                         "  \"user\" : \"%s\"\n"
+                         "  \"user\" : \"%s\",\n"
+                         "  \"removed_at\" : null\n"
                          "}",
                          gC2dmDeviceId,
                          gAccount);
@@ -144,7 +145,8 @@ get_devices2_cb (SoupSession *session,
                          "  {\n"
                          "    \"device_token\" : \"%064d\",\n"
                          "    \"device_type\" : \"c2dm\",\n"
-                         "    \"user\" : \"%s\"\n"
+                         "    \"user\" : \"%s\",\n"
+                         "    \"removed_at\" : null\n"
                          "  }\n"
                          "]",
                          gC2dmDeviceId,
@@ -194,7 +196,8 @@ get_device_cb (SoupSession *session,
    str = g_strdup_printf("{\n"
                          "  \"device_token\" : \"%064d\",\n"
                          "  \"device_type\" : \"c2dm\",\n"
-                         "  \"user\" : \"%s\"\n"
+                         "  \"user\" : \"%s\",\n"
+                         "  \"removed_at\" : null\n"
                          "}",
                          gC2dmDeviceId,
                          gAccount);
@@ -243,7 +246,8 @@ put_cb (SoupSession *session,
    str = g_strdup_printf("{\n"
                          "  \"device_token\" : \"%064d\",\n"
                          "  \"device_type\" : \"gcm\",\n"
-                         "  \"user\" : \"%s\"\n"
+                         "  \"user\" : \"%s\",\n"
+                         "  \"removed_at\" : null\n"
                          "}",
                          gC2dmDeviceId,
                          gAccount);

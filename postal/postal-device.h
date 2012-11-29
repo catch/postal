@@ -62,9 +62,10 @@ struct _PostalDeviceClass
 };
 
 GQuark        postal_device_error_quark      (void) G_GNUC_CONST;
-const gchar  *postal_device_get_user         (PostalDevice  *device);
 const gchar  *postal_device_get_device_token (PostalDevice  *device);
 const gchar  *postal_device_get_device_type  (PostalDevice  *device);
+GTimeVal     *postal_device_get_removed_at   (PostalDevice  *device);
+const gchar  *postal_device_get_user         (PostalDevice  *device);
 GType         postal_device_get_type         (void) G_GNUC_CONST;
 gboolean      postal_device_load_from_bson   (PostalDevice  *device,
                                               MongoBson     *bson,
@@ -77,12 +78,14 @@ MongoBson    *postal_device_save_to_bson     (PostalDevice  *device,
                                               GError       **error);
 JsonNode     *postal_device_save_to_json     (PostalDevice  *device,
                                               GError       **error);
-void          postal_device_set_user         (PostalDevice  *device,
-                                              const gchar   *user);
 void          postal_device_set_device_token (PostalDevice  *device,
                                               const gchar   *device_token);
 void          postal_device_set_device_type  (PostalDevice  *device,
                                               const gchar   *device_type);
+void          postal_device_set_removed_at   (PostalDevice  *device,
+                                              GTimeVal      *removed_at);
+void          postal_device_set_user         (PostalDevice  *device,
+                                              const gchar   *user);
 
 G_END_DECLS
 
