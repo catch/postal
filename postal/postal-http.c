@@ -266,6 +266,7 @@ get_status_code (const GError *error)
          code = SOUP_STATUS_NOT_FOUND;
          break;
       case POSTAL_DEVICE_ERROR_INVALID_JSON:
+      case POSTAL_DEVICE_ERROR_UNSUPPORTED_TYPE:
          code = SOUP_STATUS_BAD_REQUEST;
          break;
       default:
