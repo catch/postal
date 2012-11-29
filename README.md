@@ -15,13 +15,13 @@ Postal is a push notification server for various mobile platforms.
  * JSON API over HTTP.
  * Support for APS devices.
  * Support for C2DM devices.
+ * Support for GCM devices.
  * Optimizations in message delivery to coalesce and aggregate when possible.
  * Doesn't require client side libraries, just use native platform libraries.
 
 ## Upcoming Features
 
  * Avoid duplicate sending of notifications with coallese key.
- * Support for GCM devices.
  * Queue notification delivery until the devices registered sleep time
    has elapsed.
  * Act as a MongoDB server for alternative failover scenarios.
