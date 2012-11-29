@@ -928,6 +928,22 @@ postal_http_start (NeoService *service)
 }
 
 static void
+postal_http_stop (NeoService *service)
+{
+   PostalHttpPrivate *priv;
+   PostalHttp *http = (PostalHttp *)service;
+
+   g_assert(POSTAL_IS_HTTP(http));
+
+   priv = http->priv;
+
+   if (priv->server) {
+      soup_server_quit(priv->server);
+      g_clear_object(&priv->server);
+   }
+}
+
+static void
 postal_http_finalize (GObject *object)
 {
    PostalHttpPrivate *priv;
@@ -955,6 +971,7 @@ postal_http_class_init (PostalHttpClass *klass)
 
    service_class = NEO_SERVICE_CLASS(klass);
    service_class->start = postal_http_start;
+   service_class->stop = postal_http_stop;
 }
 
 static void
