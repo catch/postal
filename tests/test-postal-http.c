@@ -228,6 +228,44 @@ test4 (void)
    g_clear_object(&gApplication);
 }
 
+static void
+delete_cb (SoupSession *session,
+           SoupMessage *message,
+           gpointer     user_data)
+{
+   g_assert(SOUP_IS_SESSION(session));
+   g_assert(SOUP_IS_MESSAGE(message));
+
+   g_assert_cmpint(message->status_code, ==, 204);
+   g_assert_cmpstr(message->response_body->data, ==, "");
+
+   g_application_quit(G_APPLICATION(gApplication));
+}
+
+static void
+test5 (void)
+{
+   SoupSession *session;
+   SoupMessage *message;
+   gchar *url;
+
+   gApplication = application_new(G_STRFUNC);
+
+   session = soup_session_async_new();
+   g_assert(SOUP_IS_SESSION(session));
+
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064d", gAccount, gC2dmDeviceId);
+   message = soup_message_new("DELETE", url);
+   g_assert(SOUP_IS_MESSAGE(message));
+   g_free(url);
+
+   soup_session_queue_message(session, message, delete_cb, NULL);
+
+   g_application_run(G_APPLICATION(gApplication), 0, NULL);
+
+   g_clear_object(&gApplication);
+}
+
 gint
 main (gint argc,
       gchar *argv[])
@@ -250,6 +288,7 @@ main (gint argc,
    g_test_add_func("/PostalHttp/add_device", test2);
    g_test_add_func("/PostalHttp/get_devices2", test3);
    g_test_add_func("/PostalHttp/get_device", test4);
+   g_test_add_func("/PostalHttp/remove_device", test5);
 
    return g_test_run();
 }
