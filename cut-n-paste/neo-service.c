@@ -138,6 +138,22 @@ neo_service_stop (NeoService *service)
 }
 
 static void
+neo_service_dispose (GObject *object)
+{
+   NEO_ENTRY;
+
+   if (neo_service_get_is_running(NEO_SERVICE(object))) {
+      neo_service_stop(NEO_SERVICE(object));
+   }
+
+   if (G_OBJECT_CLASS(neo_service_parent_class)->dispose) {
+      G_OBJECT_CLASS(neo_service_parent_class)->dispose(object);
+   }
+
+   NEO_EXIT;
+}
+
+static void
 neo_service_finalize (GObject *object)
 {
    NeoServicePrivate *priv;
@@ -204,6 +220,7 @@ neo_service_class_init (NeoServiceClass *klass)
    NEO_ENTRY;
 
    object_class = G_OBJECT_CLASS(klass);
+   object_class->dispose = neo_service_dispose;
    object_class->finalize = neo_service_finalize;
    object_class->get_property = neo_service_get_property;
    object_class->set_property = neo_service_set_property;
