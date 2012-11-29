@@ -139,6 +139,8 @@ postal_application_activate (GApplication *application)
 
    g_application_hold(application);
 
+   postal_service_start(POSTAL_SERVICE_DEFAULT);
+
    EXIT;
 }
 
