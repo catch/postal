@@ -224,6 +224,40 @@ mongo_object_id_new_from_string (const gchar *string)
 }
 
 /**
+ * mongo_object_id_to_string_r: (skip):
+ * @object_id: (in): A #MongoObjectId.
+ * @string: (out): A location for the resulting string bytes.
+ *
+ * Converts @object_id into a hex string and stores it in @string.
+ */
+void
+mongo_object_id_to_string_r (const MongoObjectId *object_id,
+                             gchar                string[25])
+{
+   guint16 *dst;
+   guint8 *id = (guint8 *)object_id;
+
+   g_return_if_fail(object_id);
+   g_return_if_fail(string);
+
+   dst = (guint16 *)string;
+
+   dst[0] = gHexTable[id[0]];
+   dst[1] = gHexTable[id[1]];
+   dst[2] = gHexTable[id[2]];
+   dst[3] = gHexTable[id[3]];
+   dst[4] = gHexTable[id[4]];
+   dst[5] = gHexTable[id[5]];
+   dst[6] = gHexTable[id[6]];
+   dst[7] = gHexTable[id[7]];
+   dst[8] = gHexTable[id[8]];
+   dst[9] = gHexTable[id[9]];
+   dst[10] = gHexTable[id[10]];
+   dst[11] = gHexTable[id[11]];
+   string[24] = '\0';
+}
+
+/**
  * mongo_object_id_to_string:
  * @object_id: (in): A #MongoObjectId.
  *
