@@ -211,7 +211,57 @@ sandbox = false
 
 \subsection{c2dm}
 
+Google's C2DM service requires an old Google Client style auth token.
+You can find out more about generating one of these tokens at \url{https://developers.google.com/gdata/articles/using_cURL#authenticating-clientlogin}.
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+auth-token & \verb|my_auth_token| & A Google Client Auth token. \\
+\hline
+\end{tabular}
+\caption{Google C2DM Configuration Options}
+\end{figure}
+
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[c2dm]
+auth-token = 123456789012345678901234567890
+\end{Terminal}
+\caption{Google C2DM Configuration Example}
+\end{figure}
+
 \subsection{gcm}
+
+Google's GCM requires an authorization token.
+You can find out more about generating one of these tokens at \url{http://developer.android.com/guide/google/gcm/gs.html}.
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+auth-token & \verb|my_auth_key| & A Google Authorization Key. \\
+\hline
+\end{tabular}
+\caption{Google GCM Configuration Options}
+\end{figure}
+
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[gcm]
+auth-token = abcdefghijklmopqrstuvwxyz
+\end{Terminal}
+\caption{Google GCM Configuration Example}
+\end{figure}
 
 \section{REST API}
 
