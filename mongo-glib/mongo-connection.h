@@ -124,6 +124,7 @@ void               mongo_connection_update_async        (MongoConnection      *c
                                                          gpointer              user_data);
 gboolean           mongo_connection_update_finish       (MongoConnection      *connection,
                                                          GAsyncResult         *result,
+                                                         gboolean             *updated_existing,
                                                          GError              **error);
 void               mongo_connection_kill_cursors_async  (MongoConnection      *connection,
                                                          guint64              *cursors,

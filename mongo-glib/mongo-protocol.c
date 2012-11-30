@@ -227,6 +227,8 @@ mongo_protocol_append_getlasterror (MongoProtocol *protocol,
    MongoProtocolPrivate *priv;
    MongoBson *bson;
    guint32 request_id;
+   gchar **split;
+   gchar *db_cmd;
    guint offset;
 
    ENTRY;
@@ -264,6 +266,10 @@ mongo_protocol_append_getlasterror (MongoProtocol *protocol,
       mongo_bson_append_boolean(bson, "fsync", priv->getlasterror_fsync);
    }
 
+   split = g_strsplit(db_and_collection, ".", 2);
+   db_cmd = g_strdup_printf("%s.$cmd", split[0]);
+   g_strfreev(split);
+
    /*
     * Build the MONGO_OPERATION_QUERY message.
     */
@@ -272,13 +278,14 @@ mongo_protocol_append_getlasterror (MongoProtocol *protocol,
    mongo_protocol_append_int32(array, 0);
    mongo_protocol_append_int32(array, GINT32_TO_LE(MONGO_OPERATION_QUERY));
    mongo_protocol_append_int32(array, GINT32_TO_LE(MONGO_QUERY_NONE));
-   mongo_protocol_append_cstring(array, "admin.$cmd");
+   mongo_protocol_append_cstring(array, db_cmd);
    mongo_protocol_append_int32(array, 0);
-   mongo_protocol_append_int32(array, 0);
+   mongo_protocol_append_int32(array, 1);
    mongo_protocol_append_bson(array, bson);
    mongo_protocol_overwrite_int32(array, offset,
-                                 GINT32_TO_LE(array->len - offset));
+                                  GINT32_TO_LE(array->len - offset));
 
+   g_free(db_cmd);
    mongo_bson_unref(bson);
 
    EXIT;
@@ -347,24 +354,51 @@ mongo_protocol_update_async (MongoProtocol       *protocol,
    EXIT;
 }
 
+/**
+ * mongo_protocol_update_finish:
+ * @protocol: (in): A #MongoProtocol.
+ * @result: (in): A #GAsyncResult.
+ * @updated_existing: (out) (allow-none): A location for a #gboolean.
+ * @error: (out): A location for a #GError, or %NULL.
+ *
+ * Completes an asynchronous request to update the MongoDB database.
+ * If @updated_existing is not %NULL, then it will be set to %TRUE if a
+ * document was updated. Otherwise %FALSE.
+ *
+ * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
+ */
 gboolean
 mongo_protocol_update_finish (MongoProtocol  *protocol,
                               GAsyncResult   *result,
+                              gboolean       *updated_existing,
                               GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
-   gboolean ret;
+   MongoMessageReply *reply;
+   MongoBsonIter iter;
+   GList *list;
 
    ENTRY;
 
    g_return_val_if_fail(MONGO_IS_PROTOCOL(protocol), FALSE);
    g_return_val_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple), FALSE);
 
-   if (!(ret = g_simple_async_result_get_op_res_gboolean(simple))) {
+   if (!(reply = g_simple_async_result_get_op_res_gpointer(simple))) {
       g_simple_async_result_propagate_error(simple, error);
    }
 
-   RETURN(ret);
+   if (updated_existing) {
+      *updated_existing = FALSE;
+      if ((list = mongo_message_reply_get_documents(reply))) {
+         if (mongo_bson_iter_init_find(&iter, list->data, "updatedExisting")) {
+            if (MONGO_BSON_ITER_HOLDS_BOOLEAN(&iter)) {
+               *updated_existing = mongo_bson_iter_get_value_boolean(&iter);
+            }
+         }
+      }
+   }
+
+   RETURN(!!reply);
 }
 
 void

@@ -86,6 +86,7 @@ void        mongo_protocol_update_async        (MongoProtocol        *protocol,
                                                 gpointer              user_data);
 gboolean    mongo_protocol_update_finish       (MongoProtocol        *protocol,
                                                 GAsyncResult         *result,
+                                                gboolean             *updated_existing,
                                                 GError              **error);
 void        mongo_protocol_insert_async        (MongoProtocol        *protocol,
                                                 const gchar          *db_and_collection,

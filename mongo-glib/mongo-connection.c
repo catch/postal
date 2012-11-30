@@ -175,6 +175,7 @@ mongo_connection_update_cb (GObject      *object,
    GSimpleAsyncResult *simple = user_data;
    MongoProtocol *protocol = (MongoProtocol *)object;
    gboolean ret;
+   gboolean updated_existing = FALSE;
    GError *error = NULL;
 
    ENTRY;
@@ -182,11 +183,17 @@ mongo_connection_update_cb (GObject      *object,
    g_return_if_fail(MONGO_IS_PROTOCOL(protocol));
    g_return_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   if (!(ret = mongo_protocol_update_finish(protocol, result, &error))) {
+   if (!(ret = mongo_protocol_update_finish(protocol,
+                                            result,
+                                            &updated_existing,
+                                            &error))) {
       g_simple_async_result_take_error(simple, error);
    }
 
    g_simple_async_result_set_op_res_gboolean(simple, ret);
+   g_object_set_data(G_OBJECT(simple),
+                     "updated-existing",
+                     GINT_TO_POINTER(updated_existing));
    mongo_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
 
@@ -641,7 +648,13 @@ mongo_connection_ismaster_cb (GObject      *object,
                     connection);
 
    /*
-    * Emit the "connected" signal.
+    * Emit the ::connected signal.
+    *
+    * This is emitted before flushing pending requests so that it fires
+    * whether or not those pending requests cause it to disconnect. The
+    * queuing mechanism will check to see if the queue is empty so that
+    * requests from this signal stay in proper FIFO order behind queued
+    * requests.
     */
    g_signal_emit(connection, gSignals[CONNECTED], 0);
 
@@ -812,8 +825,17 @@ mongo_connection_queue (MongoConnection *connection,
       g_queue_push_tail(priv->queue, request);
       break;
    case STATE_CONNECTED:
-      request_run(request, priv->protocol);
-      request_free(request);
+      /*
+       * If we were called via ::connected callback then there could
+       * be other requests to service first. Push to the back of the
+       * queue in that case.
+       */
+      if (g_queue_is_empty(priv->queue)) {
+         request_run(request, priv->protocol);
+         request_free(request);
+      } else {
+         g_queue_push_tail(priv->queue, request);
+      }
       break;
    case STATE_DISPOSED:
    default:
@@ -1189,15 +1211,20 @@ mongo_connection_update_async (MongoConnection     *connection,
  * mongo_connection_update_finish:
  * @connection: A #MongoConnection.
  * @result: A #GAsyncResult.
+ * @updated_existing: (out) (allow-none): A location for a #gboolean.
  * @error: (allow-none) (out): A location for a #GError, or %NULL.
  *
  * Completes an asynchronous request to mongo_connection_update_async().
+ *
+ * If @updated_existing is not %NULL, then it will be set to %TRUE if an
+ * existing document was updated. Otherwise %FALSE.
  *
  * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
  */
 gboolean
 mongo_connection_update_finish (MongoConnection  *connection,
                                 GAsyncResult     *result,
+                                gboolean         *updated_existing,
                                 GError          **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
@@ -1210,6 +1237,12 @@ mongo_connection_update_finish (MongoConnection  *connection,
 
    if (!(ret = g_simple_async_result_get_op_res_gboolean(simple))) {
       g_simple_async_result_propagate_error(simple, error);
+   }
+
+   if (updated_existing) {
+      *updated_existing =
+         GPOINTER_TO_INT(g_object_get_data(G_OBJECT(result),
+                                           "updated-existing"));
    }
 
    RETURN(ret);
