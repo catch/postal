@@ -107,6 +107,81 @@ Fedora packages are not available at this time, but are planned.
 
 \section{Configuration}
 
+Postal uses a standard \verb|key-file| format for configuration.
+This is similar to an \verb|.ini| format from other Operating Systems.
+
+Each configuration section is provided below with their options.
+
+\subsection{http}
+
+This section provides configuration of the HTTP REST API.
+The embedded HTTP is how external systems communicate with Postal.
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+nologging & \verb|true| or \verb|false| & If HTTP logging is disabled. \\
+port & \verb|5300| & The TCP port to listen on. \\
+logfile & \file{/var/log/postal/access.log} & The HTTP access logfile. \\
+\hline
+\end{tabular}
+\caption{HTTP Configuration Options}
+\end{figure}
+
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[http]
+nologging = false
+port = 8080
+logfile = /var/log/postal/access.log
+\end{Terminal}
+\caption{HTTP Configuration Example}
+\end{figure}
+
+\subsection{mongo}
+
+This section provides configuration for communicating with MongoDB.
+You are responsible for configuring and managing your MongoDB server.
+
+It would be wise to have a \emph{replicaSet} configured to prevent loosing data!
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+db & \emph{myapp} & The name of the MongoDb database. \\
+collection & \emph{devices} & The collection to store devices in. \\
+uri & \emph{\small mongodb://localhost/?w=2} & The MongoDb connection URI. \\
+\hline
+\end{tabular}
+\caption{Mongo Configuration Options}
+\end{figure}
+
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[mongo]
+db = myapp
+collection = devices
+uri = mongodb://localhost/?replicaSet=myrep&journal=true&w=2&wtimeoutMS=5000
+\end{Terminal}
+\caption{Mongo Configuration Example}
+\end{figure}
+
+\subsection{aps}
+
+\subsection{c2dm}
+
+\subsection{gcm}
+
 \section{REST API}
 
 \subsection{Creating and Managing Devices}
