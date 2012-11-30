@@ -1,0 +1,13 @@
+[Unit]
+Description=A Push Notification Server
+After=syslog.target network.target
+
+[Service]
+Type=simple
+User=nobody
+PIDFile=/var/run/postal/postald.pid
+EnvironmentFile=/etc/sysconfig/postald
+ExecStart=@prefix@/bin/postald $OPTIONS
+
+[Install]
+WantedBy=multi-user.target

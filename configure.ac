@@ -144,6 +144,8 @@ dnl Output
 dnl **************************************************************************
 AC_CONFIG_FILES([
 	Makefile
+	init/postald.conf
+	init/postald.service
 ])
 AC_OUTPUT
 
