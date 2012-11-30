@@ -178,6 +178,37 @@ uri = mongodb://localhost/?replicaSet=myrep&journal=true&w=2&wtimeoutMS=5000
 
 \subsection{aps}
 
+The Apple Push Notification System requires that you use client SSL certificates to communicate with their gateway.
+You will need both the private key and certificate available in PEM format to communicate with the Apple Push Notification gateway.
+
+\textbf{TODO} - Add section on how to generate sub keys and publish to Apple.
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+ssl-cert-file & \file{cert.pem} & Path to SSL certificate. \\
+ssl-key-file & \file{key.pem} & Path to SSL private key. \\
+sandbox & \verb|true| or \verb|false| & Connect to sandbox gateway. \\
+\hline
+\end{tabular}
+\caption{Apple Push Notification Configuration Options}
+\end{figure}
+
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[aps]
+ssl-cert-file = /etc/ssl/certs/aps.pem
+ssl-key-file = /etc/ssl/private/aps.pem
+sandbox = false
+\end{Terminal}
+\caption{Apple Push Notification Configuration Example}
+\end{figure}
+
 \subsection{c2dm}
 
 \subsection{gcm}
