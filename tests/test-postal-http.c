@@ -84,7 +84,7 @@ add_device_cb (SoupSession *session,
    g_assert_cmpint(message->status_code, ==, 201);
 
    str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_token\" : \"%064u\",\n"
                          "  \"device_type\" : \"c2dm\",\n"
                          "  \"user\" : \"%s\",\n"
                          "  \"removed_at\" : null\n"
@@ -109,8 +109,9 @@ test2 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
-   message = soup_message_new("POST", url);
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u",
+                         gAccount, gC2dmDeviceId);
+   message = soup_message_new("PUT", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
 
@@ -143,7 +144,7 @@ get_devices2_cb (SoupSession *session,
 
    str = g_strdup_printf("[\n"
                          "  {\n"
-                         "    \"device_token\" : \"%064d\",\n"
+                         "    \"device_token\" : \"%064u\",\n"
                          "    \"device_type\" : \"c2dm\",\n"
                          "    \"user\" : \"%s\",\n"
                          "    \"removed_at\" : null\n"
@@ -194,7 +195,7 @@ get_device_cb (SoupSession *session,
    g_assert_cmpint(message->status_code, ==, 200);
 
    str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_token\" : \"%064u\",\n"
                          "  \"device_type\" : \"c2dm\",\n"
                          "  \"user\" : \"%s\",\n"
                          "  \"removed_at\" : null\n"
@@ -219,7 +220,7 @@ test4 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064d", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -244,7 +245,7 @@ put_cb (SoupSession *session,
    g_assert_cmpint(message->status_code, ==, 200);
 
    str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_token\" : \"%064u\",\n"
                          "  \"device_type\" : \"gcm\",\n"
                          "  \"user\" : \"%s\",\n"
                          "  \"removed_at\" : null\n"
@@ -270,13 +271,13 @@ test5 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064d", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("PUT", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
 
    str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064d\",\n"
+                         "  \"device_token\" : \"%064u\",\n"
                          "  \"device_type\" : \"gcm\"\n"
                          "}",
                          gC2dmDeviceId);
@@ -316,7 +317,7 @@ test6 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064d", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("DELETE", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -342,7 +343,7 @@ main (gint argc,
 
    gC2dmDeviceId = g_random_int();
    gC2dmDevice = g_strdup_printf("{\n"
-                                 "  \"device_token\": \"%064d\",\n"
+                                 "  \"device_token\": \"%064u\",\n"
                                  "  \"device_type\": \"c2dm\"\n"
                                  "}", gC2dmDeviceId);
 

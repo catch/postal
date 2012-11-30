@@ -63,6 +63,7 @@ void           postal_service_add_device           (PostalService        *servic
                                                     gpointer              user_data);
 gboolean       postal_service_add_device_finish    (PostalService        *service,
                                                     GAsyncResult         *result,
+                                                    gboolean             *updated_existing,
                                                     GError              **error);
 void           postal_service_find_device          (PostalService        *service,
                                                     const gchar          *user,
@@ -94,14 +95,6 @@ gboolean       postal_service_remove_device_finish (PostalService        *servic
 void           postal_service_set_config           (PostalService        *service,
                                                     GKeyFile             *config);
 void           postal_service_start                (PostalService        *service);
-void           postal_service_update_device        (PostalService        *service,
-                                                    PostalDevice         *device,
-                                                    GCancellable         *cancellable,
-                                                    GAsyncReadyCallback   callback,
-                                                    gpointer              user_data);
-gboolean       postal_service_update_device_finish (PostalService        *service,
-                                                    GAsyncResult         *result,
-                                                    GError              **error);
 void           postal_service_notify               (PostalService        *service,
                                                     PostalNotification   *notification,
                                                     gchar               **users,

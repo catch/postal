@@ -30,6 +30,7 @@ test1_cb3 (GObject      *object,
       }
    }
 
+   g_assert_cmpint(devices->len, >, 0);
    g_assert_cmpint(i, <, devices->len);
    g_assert_cmpstr(postal_device_get_user(device), ==, postal_device_get_user(g_ptr_array_index(devices, i)));
 
@@ -67,12 +68,14 @@ test1_cb1 (GObject      *object,
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device = user_data;
+   gboolean updated_existing;
    gboolean ret;
    GError *error = NULL;
 
-   ret = postal_service_update_device_finish(service, result, &error);
+   ret = postal_service_add_device_finish(service, result, &updated_existing, &error);
    g_assert_no_error(error);
    g_assert(ret);
+   g_assert(updated_existing);
 
    postal_service_remove_device(service, device, NULL, test1_cb2, device);
 }
@@ -84,14 +87,16 @@ test1_cb (GObject      *object,
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device = user_data;
+   gboolean updated_existing;
    gboolean ret;
    GError *error = NULL;
 
-   ret = postal_service_add_device_finish(service, result, &error);
+   ret = postal_service_add_device_finish(service, result, &updated_existing, &error);
    g_assert_no_error(error);
    g_assert(ret);
+   g_assert(!updated_existing);
 
-   postal_service_update_device(service, device, NULL, test1_cb1, device);
+   postal_service_add_device(service, device, NULL, test1_cb1, device);
 }
 
 static void
@@ -109,7 +114,7 @@ test1 (void)
    postal_service_set_config(service, key_file);
    postal_service_start(service);
    device = postal_device_new();
-   rand_str = g_strdup_printf("%d", g_random_int());
+   rand_str = g_strdup_printf("%u", g_random_int());
    postal_device_set_device_token(device, rand_str);
    g_free(rand_str);
    postal_device_set_user(device, "000011110000111100001111");

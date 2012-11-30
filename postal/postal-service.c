@@ -96,6 +96,7 @@ postal_service_add_device_cb (GObject      *object,
 {
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
+   gboolean updated_existing;
    gboolean ret;
    GError *error = NULL;
 
@@ -105,7 +106,10 @@ postal_service_add_device_cb (GObject      *object,
    g_assert(G_IS_ASYNC_RESULT(result));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   if (!(ret = mongo_connection_insert_finish(connection, result, &error))) {
+   if (!(ret = mongo_connection_update_finish(connection,
+                                              result,
+                                              &updated_existing,
+                                              &error))) {
       g_simple_async_result_take_error(simple, error);
 #ifdef ENABLE_REDIS
    } else {
@@ -115,6 +119,10 @@ postal_service_add_device_cb (GObject      *object,
       postal_redis_device_added(device);
 #endif
    }
+
+   g_object_set_data(G_OBJECT(simple),
+                     "updated-existing",
+                     GINT_TO_POINTER(updated_existing));
 
    g_simple_async_result_set_op_res_gboolean(simple, ret);
    g_simple_async_result_complete_in_idle(simple);
@@ -144,8 +152,11 @@ postal_service_add_device (PostalService       *service,
 {
    PostalServicePrivate *priv;
    GSimpleAsyncResult *simple;
+   MongoObjectId *oid;
    MongoBsonIter iter;
    MongoBson *bson;
+   MongoBson *q;
+   MongoBson *set;
    GError *error = NULL;
 
    ENTRY;
@@ -175,24 +186,50 @@ postal_service_add_device (PostalService       *service,
       mongo_bson_append_null(bson, "removed_at");
    }
 
+   set = mongo_bson_new_empty();
+   mongo_bson_append_bson(set, "$set", bson);
+
    /*
-    * Asynchronously insert the document to Mongo.
+    * Build query so we can upsert the previous item if it exists.
+    */
+   q = mongo_bson_new_empty();
+   mongo_bson_append_string(q, "device_token",
+                            postal_device_get_device_token(device));
+   if (mongo_bson_iter_init_find(&iter, bson, "user")) {
+      if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_OBJECT_ID) {
+         oid = mongo_bson_iter_get_value_object_id(&iter);
+         mongo_bson_append_object_id(q, "user", oid);
+         mongo_object_id_free(oid);
+      } else if (mongo_bson_iter_get_value_type(&iter) == MONGO_BSON_UTF8) {
+         mongo_bson_append_string(q, "user",
+               mongo_bson_iter_get_value_string(&iter, NULL));
+      } else {
+         g_assert_not_reached();
+      }
+   }
+
+   /*
+    * Asynchronously upsert the document to Mongo.
     */
    simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
                                       postal_service_add_device);
+   g_simple_async_result_set_check_cancellable(simple, cancellable);
    g_object_set_data_full(G_OBJECT(simple),
                           "device",
                           g_object_ref(device),
                           g_object_unref);
-   mongo_connection_insert_async(priv->mongo,
+   mongo_connection_update_async(priv->mongo,
                                  priv->db_and_collection,
-                                 MONGO_INSERT_NONE,
-                                 &bson,
-                                 1,
+                                 MONGO_UPDATE_UPSERT,
+                                 q,
+                                 set,
                                  cancellable,
                                  postal_service_add_device_cb,
                                  simple);
+
    mongo_bson_unref(bson);
+   mongo_bson_unref(q);
+   mongo_bson_unref(set);
 
    EXIT;
 }
@@ -201,15 +238,19 @@ postal_service_add_device (PostalService       *service,
  * postal_service_add_device_finish:
  * @service: (in): A #PostalService.
  * @result: (in): A #GAsyncResult.
+ * @updated_existing: (out) (allow-none): A location for a #gboolean.
  * @error: (out): A location for a #GError, or %NULL.
  *
  * Completes an asynchronous request to postal_service_add_device().
+ *
+ * If an existing device was updated, then @updated_existing is set to %TRUE.
  *
  * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
  */
 gboolean
 postal_service_add_device_finish (PostalService  *service,
                                   GAsyncResult   *result,
+                                  gboolean       *updated_existing,
                                   GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
@@ -224,6 +265,12 @@ postal_service_add_device_finish (PostalService  *service,
       g_simple_async_result_propagate_error(simple, error);
    }
 
+   if (updated_existing) {
+      *updated_existing =
+            GPOINTER_TO_INT(g_object_get_data(G_OBJECT(result),
+                                              "updated-existing"));
+   }
+
    RETURN(ret);
 }
 
@@ -234,6 +281,7 @@ postal_service_remove_device_cb (GObject      *object,
 {
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
+   gboolean updated_existing;
    gboolean ret;
    GError *error = NULL;
 
@@ -243,7 +291,10 @@ postal_service_remove_device_cb (GObject      *object,
    g_assert(G_IS_ASYNC_RESULT(result));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   if (!(ret = mongo_connection_update_finish(connection, result, &error))) {
+   if (!(ret = mongo_connection_update_finish(connection,
+                                              result,
+                                              &updated_existing,
+                                              &error))) {
       g_simple_async_result_take_error(simple, error);
 #ifdef ENABLE_REDIS
    } else {
@@ -517,9 +568,9 @@ postal_service_find_devices (PostalService       *service,
                          "database", priv->db,
                          "collection", priv->collection,
                          "connection", priv->mongo,
-                         "limit", (guint)limit,
+                         "limit", (gint)limit,
                          "query", q,
-                         "skip", (guint)offset,
+                         "skip", (gint)offset,
                          NULL);
 
    simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
@@ -695,162 +746,6 @@ postal_service_find_device_finish (PostalService  *service,
       g_simple_async_result_propagate_error(simple, error);
    } else {
       ret = g_object_ref(ret);
-   }
-
-   RETURN(ret);
-}
-
-static void
-postal_service_update_device_cb (GObject      *object,
-                                 GAsyncResult *result,
-                                 gpointer      user_data)
-{
-   GSimpleAsyncResult *simple = user_data;
-   MongoConnection *connection = (MongoConnection *)object;
-   gboolean ret;
-   GError *error = NULL;
-
-   ENTRY;
-
-   g_assert(MONGO_IS_CONNECTION(connection));
-   g_assert(G_IS_ASYNC_RESULT(result));
-   g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
-
-   if (!(ret = mongo_connection_update_finish(connection, result, &error))) {
-      g_simple_async_result_take_error(simple, error);
-#ifdef ENABLE_REDIS
-   } else {
-      PostalDevice *device;
-
-      device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
-      postal_redis_device_updated(device);
-#endif
-   }
-
-   g_simple_async_result_set_op_res_gboolean(simple, ret);
-   g_simple_async_result_complete_in_idle(simple);
-   g_object_unref(simple);
-
-   EXIT;
-}
-
-void
-postal_service_update_device (PostalService       *service,
-                              PostalDevice        *device,
-                              GCancellable        *cancellable,
-                              GAsyncReadyCallback  callback,
-                              gpointer             user_data)
-{
-   PostalServicePrivate *priv;
-   GSimpleAsyncResult *simple;
-   MongoObjectId *user_id;
-   const gchar *device_token;
-   const gchar *user;
-   MongoBson *q;
-   MongoBson *u;
-   GError *error = NULL;
-
-   ENTRY;
-
-   g_return_if_fail(POSTAL_IS_SERVICE(service));
-   g_return_if_fail(POSTAL_IS_DEVICE(device));
-   g_return_if_fail(!cancellable || G_IS_CANCELLABLE(cancellable));
-   g_return_if_fail(callback);
-
-   priv = service->priv;
-
-   /*
-    * Make sure we have an _id field to remove.
-    */
-   if (!(device_token = postal_device_get_device_token(device))) {
-      g_simple_async_report_error_in_idle(G_OBJECT(service),
-                                          callback,
-                                          user_data,
-                                          POSTAL_DEVICE_ERROR,
-                                          POSTAL_DEVICE_ERROR_MISSING_ID,
-                                          _("id is missing from device."));
-      EXIT;
-   }
-
-   /*
-    * Make sure we have the user so that we can enforce the device
-    * was created by a particular user. This isn't meant to be security
-    * enforcement, but to help prevent API consumers from deleting the wrong
-    * data.
-    */
-   if (!(user = postal_device_get_user(device))) {
-      g_simple_async_report_error_in_idle(G_OBJECT(service),
-                                          callback,
-                                          user_data,
-                                          POSTAL_DEVICE_ERROR,
-                                          POSTAL_DEVICE_ERROR_MISSING_USER,
-                                          _("user is missing from device."));
-      EXIT;
-   }
-
-   /*
-    * Build our update document.
-    */
-   if (!(u = postal_device_save_to_bson(device, &error))) {
-      g_simple_async_report_take_gerror_in_idle(G_OBJECT(service),
-                                                callback,
-                                                user_data,
-                                                error);
-      EXIT;
-   }
-
-   /*
-    * Build our query for the device to update.
-    */
-   q = mongo_bson_new_empty();
-   mongo_bson_append_string(q, "device_token", device_token);
-   if ((user_id = mongo_object_id_new_from_string(user))) {
-      mongo_bson_append_object_id(q, "user", user_id);
-      mongo_object_id_free(user_id);
-   } else {
-      mongo_bson_append_string(q, "user", user);
-   }
-   mongo_bson_append_null(q, "removed_at");
-
-   /*
-    * Asynchronously update the document.
-    */
-   simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
-                                      postal_service_update_device);
-   g_object_set_data_full(G_OBJECT(simple),
-                          "device",
-                          g_object_ref(device),
-                          g_object_unref);
-   mongo_connection_update_async(priv->mongo,
-                                 priv->db_and_collection,
-                                 MONGO_UPDATE_NONE,
-                                 q,
-                                 u,
-                                 cancellable,
-                                 postal_service_update_device_cb,
-                                 simple);
-
-   mongo_bson_unref(q);
-   mongo_bson_unref(u);
-
-   EXIT;
-}
-
-gboolean
-postal_service_update_device_finish (PostalService  *service,
-                                     GAsyncResult   *result,
-                                     GError        **error)
-{
-   GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
-   gboolean ret;
-
-   ENTRY;
-
-   g_return_val_if_fail(POSTAL_IS_SERVICE(service), FALSE);
-   g_return_val_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple), FALSE);
-
-   if (!(ret = g_simple_async_result_get_op_res_gboolean(simple))) {
-      g_simple_async_result_propagate_error(simple, error);
    }
 
    RETURN(ret);
@@ -1298,15 +1193,23 @@ postal_service_aps_identity_removed_cb (GObject      *object,
                                         gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
+   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
 
    g_return_if_fail(MONGO_IS_CONNECTION(connection));
 
-   if (!mongo_connection_update_finish(connection, result, &error)) {
+   if (!mongo_connection_update_finish(connection,
+                                       result,
+                                       &updated_existing,
+                                       &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
+   } else if (!updated_existing) {
+      /*
+       * XXX: Should we log this?
+       */
    }
 
    EXIT;
@@ -1365,15 +1268,23 @@ postal_service_c2dm_identity_removed_cb (GObject      *object,
                                          gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
+   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
 
    g_return_if_fail(MONGO_IS_CONNECTION(connection));
 
-   if (!mongo_connection_update_finish(connection, result, &error)) {
+   if (!mongo_connection_update_finish(connection,
+                                       result,
+                                       &updated_existing,
+                                       &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
+   } else if (!updated_existing) {
+      /*
+       * TODO: Should we log this?
+       */
    }
 
    EXIT;
@@ -1432,15 +1343,23 @@ postal_service_gcm_identity_removed_cb (GObject      *object,
                                         gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
+   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
 
    g_return_if_fail(MONGO_IS_CONNECTION(connection));
 
-   if (!mongo_connection_update_finish(connection, result, &error)) {
+   if (!mongo_connection_update_finish(connection,
+                                       result,
+                                       &updated_existing,
+                                       &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
+   } else if (!updated_existing) {
+      /*
+       * TODO: Should we log this?
+       */
    }
 
    EXIT;

@@ -32,6 +32,9 @@
 
 #include "url-router.h"
 
+#undef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "http"
+
 G_DEFINE_TYPE(PostalHttp, postal_http, NEO_TYPE_SERVICE)
 
 struct _PostalHttpPrivate
@@ -329,33 +332,53 @@ failure:
 }
 
 static void
-postal_http_update_device_cb (GObject      *object,
-                              GAsyncResult *result,
-                              gpointer      user_data)
+postal_http_add_device_cb (GObject      *object,
+                           GAsyncResult *result,
+                           gpointer      user_data)
 {
    PostalService *service = (PostalService *)object;
    PostalDevice *device;
    SoupMessage *message = user_data;
    PostalHttp *http;
-   GError *error;
+   gboolean updated_existing = FALSE;
+   GError *error = NULL;
+   gchar *str;
+
+   ENTRY;
 
    g_assert(POSTAL_IS_SERVICE(service));
    g_assert(SOUP_IS_MESSAGE(message));
    http = g_object_get_data(user_data, "http");
    g_assert(POSTAL_IS_HTTP(http));
 
-   if (!postal_service_update_device_finish(service, result, &error)) {
+   if (!postal_service_add_device_finish(service, result, &updated_existing, &error)) {
       postal_http_reply_error(http, message, error);
       g_error_free(error);
       GOTO(failure);
    }
 
-   device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(message), "device"));
-   postal_http_reply_device(http, message, SOUP_STATUS_OK, device);
+   if ((device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(message), "device")))) {
+      str = g_strdup_printf("/v1/users/%s/devices/%s",
+                            postal_device_get_user(device),
+                            postal_device_get_device_token(device));
+      soup_message_headers_append(message->response_headers,
+                                  "Location",
+                                  str);
+      g_free(str);
+      postal_http_reply_device(http,
+                               message,
+                               updated_existing ? SOUP_STATUS_OK : SOUP_STATUS_CREATED,
+                               device);
+   } else {
+      g_assert_not_reached();
+   }
 
 failure:
    g_object_unref(message);
+
+   EXIT;
 }
+
 
 static void
 postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
@@ -430,16 +453,17 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
          g_object_unref(pdev);
          EXIT;
       }
+      postal_device_set_device_token(pdev, device);
       json_node_free(node);
       g_object_set_data_full(G_OBJECT(message),
                              "device",
                              g_object_ref(pdev),
                              g_object_unref);
-      postal_service_update_device(POSTAL_SERVICE_DEFAULT,
-                                   pdev,
-                                   NULL, /* TODO */
-                                   postal_http_update_device_cb,
-                                   g_object_ref(message));
+      postal_service_add_device(POSTAL_SERVICE_DEFAULT,
+                                pdev,
+                                NULL, /* TODO */
+                                postal_http_add_device_cb,
+                                g_object_ref(message));
       soup_server_pause_message(server, message);
       g_object_unref(pdev);
       EXIT;
@@ -486,50 +510,6 @@ failure:
 }
 
 static void
-postal_http_add_device_cb (GObject      *object,
-                           GAsyncResult *result,
-                           gpointer      user_data)
-{
-   PostalService *service = (PostalService *)object;
-   PostalDevice *device;
-   SoupMessage *message = user_data;
-   PostalHttp *http;
-   GError *error = NULL;
-   gchar *str;
-
-   ENTRY;
-
-   g_assert(POSTAL_IS_SERVICE(service));
-   g_assert(SOUP_IS_MESSAGE(message));
-   http = g_object_get_data(user_data, "http");
-   g_assert(POSTAL_IS_HTTP(http));
-
-   if (!postal_service_add_device_finish(service, result, &error)) {
-      postal_http_reply_error(http, message, error);
-      g_error_free(error);
-      GOTO(failure);
-   }
-
-   if ((device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(message), "device")))) {
-      str = g_strdup_printf("/v1/users/%s/devices/%s",
-                            postal_device_get_user(device),
-                            postal_device_get_device_token(device));
-      soup_message_headers_append(message->response_headers,
-                                  "Location",
-                                  str);
-      g_free(str);
-      postal_http_reply_device(http, message, SOUP_STATUS_CREATED, device);
-   } else {
-      g_assert_not_reached();
-   }
-
-failure:
-   g_object_unref(message);
-
-   EXIT;
-}
-
-static void
 postal_http_handle_v1_users_user_devices (UrlRouter         *router,
                                           SoupServer        *server,
                                           SoupMessage       *message,
@@ -539,11 +519,8 @@ postal_http_handle_v1_users_user_devices (UrlRouter         *router,
                                           SoupClientContext *client,
                                           gpointer           user_data)
 {
-   PostalDevice *device;
    const gchar *user;
    PostalHttp *http = user_data;
-   JsonNode *node;
-   GError *error = NULL;
 
    ENTRY;
 
@@ -567,30 +544,6 @@ postal_http_handle_v1_users_user_devices (UrlRouter         *router,
                                   NULL, /* TODO */
                                   devices_get_cb,
                                   g_object_ref(message));
-      EXIT;
-   } else if (message->method == SOUP_METHOD_POST) {
-      if (!(node = postal_http_parse_body(message, &error))) {
-         postal_http_reply_error(http, message, error);
-         soup_server_unpause_message(server, message);
-         g_error_free(error);
-         EXIT;
-      }
-      device = postal_device_new();
-      if (!postal_device_load_from_json(device, node, &error)) {
-         postal_http_reply_error(http, message, error);
-         json_node_free(node);
-         g_object_unref(device);
-         soup_server_unpause_message(server, message);
-         g_error_free(error);
-         EXIT;
-      }
-      postal_device_set_user(device, g_hash_table_lookup(params, "user"));
-      g_object_set_data_full(G_OBJECT(message), "device", device, g_object_unref);
-      postal_service_add_device(POSTAL_SERVICE_DEFAULT,
-                                device,
-                                NULL,
-                                postal_http_add_device_cb,
-                                g_object_ref(message));
       EXIT;
    }
 
