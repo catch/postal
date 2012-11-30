@@ -40,7 +40,7 @@
 
 \lstnewenvironment{Terminal}
 {
-    \lstset{basicstyle=\ttfamily,
+    \lstset{basicstyle=\ttfamily\small,
             breaklines=true}
 }
 {}
@@ -59,6 +59,53 @@
 Postal is a free and open source push notification server written in C.
 
 \section{Introduction}
+
+Postal is a Push Notification Server.
+It supports device management and delivery of push notifications to \emph{Apple Push Notification Service (APS)}, \emph{Google Cloud to Device Messaging (C2DM)}, and \emph{Google Cloud Messaging (GCM)}.
+These are the services currently supported by the Apple iOS\footnote{Apple and iOS are registered trademarks of Apple, Inc.} and Google Android\footnote{Google and Android are registered trademarks of Google.} mobile device platforms.
+
+Postal is a server that you run as part of your infrastructure.
+You interact with it over an HTTP REST API.
+It stores and manages devices using MongoDB\footnote{For more information on MongoDB, visit http://www.mongodb.org.}.
+Optionally, you can receive events about events within Postal via the publish-subscribe mechanism of Redis\footnote{For more information on Redis, visit http://redis.io}.
+
+\section{Installation}
+
+Postal is designed to run on GNU/Linux, however other operating systems may be supported.
+
+\subsection{Installing from Source}
+
+You can fetch the most recent version of Postal from \url{https://github.com/catch/postal/downloads}.
+Installation follows the typical procedures for Free and Open Source software on GNU/Linux.
+
+Many of the configuration options seen below are not required but illustrate their use. See \verb|./configure --help| for more options.
+
+\begin{figure}[h!]
+\hrule
+\begin{Terminal}
+tar --lzma -xf postal-0.2.0.tar.xz
+cd postal-0.2.0
+./configure --prefix=/usr --libdir=/usr/lib64 --sysconfdir=/etc/postal --enable-redis=yes --enable-debug=minimal --enable-trace=no
+make
+sudo make install
+\end{Terminal}
+\hrule
+\caption{Installing Postal}
+\end{figure}
+
+\subsection{Debian}
+
+Debian packages are not available at this time, but are planned.
+
+\subsection{Ubuntu 12.04 LTS}
+
+Ubuntu packages are not available at this time, but are planned.
+
+\subsection{Fedora 18}
+
+Fedora packages are not available at this time, but are planned.
+
+\section{Configuration}
 
 \section{REST API}
 
