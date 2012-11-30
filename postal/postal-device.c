@@ -306,7 +306,11 @@ postal_device_save_to_bson (PostalDevice  *device,
       mongo_bson_append_string(ret, "user", priv->user);
    }
 
-   mongo_bson_append_timeval(ret, "removed_at", &priv->removed_at);
+   if (priv->removed_at.tv_sec || priv->removed_at.tv_usec) {
+      mongo_bson_append_timeval(ret, "removed_at", &priv->removed_at);
+   } else {
+      mongo_bson_append_null(ret, "removed_at");
+   }
 
    RETURN(ret);
 }
