@@ -329,8 +329,6 @@ push_gcm_client_deliver_async (PushGcmClient       *client,
    json_node_free(node);
    g_object_unref(g);
 
-   g_print("REQUEST: \"%s\"\n", str);
-
    soup_message_set_request(request,
                             "application/json",
                             SOUP_MEMORY_TAKE,
