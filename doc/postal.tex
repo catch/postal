@@ -1,0 +1,175 @@
+\documentclass[12pt]{article}
+\usepackage[
+    pdftitle={Postal},
+    pdfauthor={Christian Hergert},
+    pdfsubject={Postal},
+    pdfkeywords={Programming},
+    bookmarks, bookmarksopen,
+    pdfstartview=FitH,
+    colorlinks,linkcolor=blue,citecolor=blue,
+    urlcolor=red,
+]{hyperref}
+\usepackage{color}
+\usepackage{listings}
+\usepackage{parskip}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage[light,math]{iwona}
+\usepackage[T1]{fontenc}
+\parskip 7.2pt
+
+\newcommand{\versal}[1]{\noindent{\Huge #1\kern-.10em}}
+\newcommand{\file}[1]{{\bf\ttfamily #1}}
+\newcommand{\ident}[1]{{\it\ttfamily #1}}
+\newcommand{\shell}[1]{{\it\ttfamily #1}}
+\newcommand{\python}[1]{{\it\ttfamily #1}}
+\newcommand{\ruby}[1]{{\it\ttfamily #1}}
+\newcommand{\book}[2]{{\it\ttfamily #1} by {\it #2}}
+\newcommand{\program}[1]{\it\ttfamily #1}
+
+\lstnewenvironment{code}[1]
+{
+    \lstset{language=C,
+            showstringspaces=false,
+            basicstyle=\ttfamily\small,
+            caption=#1,
+            numbers=left}
+}
+{}
+
+
+\lstnewenvironment{Terminal}
+{
+    \lstset{basicstyle=\ttfamily,
+            breaklines=true}
+}
+{}
+
+
+\title{Postal \\ Push Notification Server}
+\author{Christian Hergert \\
+    \small \texttt{christian@catch.com}
+}
+
+\date{November 2012}
+
+\begin{document}
+\maketitle
+
+Postal is a free and open source push notification server written in C.
+
+\section{Introduction}
+
+\section{REST API}
+
+\subsection{Creating and Managing Devices}
+
+\subsubsection{Adding a Device}
+
+\subsubsection{Removing a Device}
+
+\subsection{Sending Notifications}
+
+\section{Metrics}
+
+Many system operators will want to know what is going on with their system.
+Postal provides a mechanism for being notified about events happening within the system.
+This mechanism uses a \verb|PUBSUB| channel via \verb|Redis| to deliver JSON formatted events.
+This feature requires that you configure Postal with \verb|--enable-redis=yes|.
+
+\subsection{Configuration}
+
+Metrics delivery via \verb|Redis| provides the following configuration options.
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{l l l}
+\hline
+Option & Value & Description \\
+\hline
+enabled & \verb|true| or \verb|false| & If metric delivery is enabled. \\
+host & \emph{hostname} & The hostname of the Redis server. \\
+port & \verb|6379| & The port of the Redis server. \\
+channel & \emph{event:postal} & The Redis PUBSUB channel name. \\
+\hline
+\end{tabular}
+\caption{Redis Configuration Options}
+\end{figure}
+
+The options should be stored in the \verb|redis| group in \file{postal.conf}.
+See the example below.
+
+\begin{figure}[h!]
+\begin{Terminal}
+[redis]
+enabled = true
+host = localhost
+port = 6379
+channel = events:postal
+\end{Terminal}
+\caption{Redis Configuration Example}
+\end{figure}
+
+\subsection{Events}
+
+The following sections describe the various types of events that you may receive.
+
+\subsubsection{Device Added}
+
+This event is published when Postal has received a request to add a new device.
+
+\begin{Terminal}
+{
+  "Action": "device-added",
+  "DeviceType": "gcm",
+  "DeviceToken": "12341234-12341234",
+  "User": "000000000000111122223333"
+}
+\end{Terminal}
+
+\subsubsection{Device Updated}
+
+This event is published when Postal has updated the information for a device.
+This could happen if an API request has been processed to change the attributes of the device.
+
+\begin{Terminal}
+{
+  "Action": "device-updated",
+  "DeviceType": "gcm",
+  "DeviceToken": "12341234-12341234",
+  "User": "000000000000111122223333"
+}
+\end{Terminal}
+
+\subsubsection{Device Removed}
+
+This event is published when Postal has been requested to remove a device.
+This could happen from an API request that specifically requests the removal of a device.
+This could also happen if push notifications have been disabled for a device.
+Additionally, with APS, this could happen if the feedback service has requested the removal of a device.
+
+\begin{Terminal}
+{
+  "Action": "device-removed",
+  "DeviceType": "gcm",
+  "DeviceToken": "12341234-12341234",
+  "User": "000000000000111122223333"
+}
+\end{Terminal}
+
+\subsubsection{Device Notified}
+
+This event is published when Postal has successfully delivered a notification to the gateway.
+This does not mean that the device has received the notification.
+The various gateways to not provide this information so that is not available.
+
+\begin{Terminal}
+{
+  "Action": "device-notified",
+  "DeviceType": "gcm",
+  "DeviceToken": "12341234-12341234",
+  "User": "000000000000111122223333"
+}
+\end{Terminal}
+
+\end{document}
