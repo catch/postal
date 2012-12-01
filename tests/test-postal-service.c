@@ -8,7 +8,9 @@ static const gchar   gKeyData[] =
    "[mongo]\n"
    "uri = mongodb://127.0.0.1:27017/?w=1&fsync=true\n"
    "db = test\n"
-   "collection = devices\n";
+   "collection = devices\n"
+   "[http]\n"
+   "nologging = true\n";
 
 static void
 test1_cb3 (GObject      *object,
