@@ -16,26 +16,68 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <redis-glib/redis-glib.h>
+#include <redis-glib.h>
 
 #include "postal-debug.h"
 #include "postal-device.h"
 #include "postal-redis.h"
 
-static gchar       *gRedisChannel;
-static RedisClient *gRedisClient;
-static gchar       *gRedisHost;
-static guint        gRedisPort;
+G_DEFINE_TYPE(PostalRedis, postal_redis, NEO_TYPE_SERVICE_BASE)
+
+struct _PostalRedisPrivate
+{
+   gchar       *channel;
+   RedisClient *redis;
+   gchar       *host;
+   guint        port;
+};
+
+PostalRedis *
+postal_redis_new (void)
+{
+   return g_object_new(POSTAL_TYPE_REDIS,
+                       "name", "redis",
+                       NULL);
+}
+
+static void
+postal_redis_set_channel (PostalRedis *redis,
+                          const gchar *channel)
+{
+   g_free(redis->priv->channel);
+   redis->priv->channel = g_strdup(channel);
+}
+
+static void
+postal_redis_set_host (PostalRedis *redis,
+                       const gchar *host)
+{
+   g_free(redis->priv->host);
+   redis->priv->host = g_strdup(host);
+}
+
+static void
+postal_redis_set_port (PostalRedis *redis,
+                        guint        port)
+{
+   redis->priv->port = port;
+}
 
 static void
 postal_redis_connect_cb (GObject      *object,
                          GAsyncResult *result,
                          gpointer      user_data)
 {
+   PostalRedisPrivate *priv;
    RedisClient *client = (RedisClient *)object;
+   PostalRedis *redis = user_data;
    GError *error = NULL;
 
    ENTRY;
+
+   g_assert(POSTAL_IS_REDIS(redis));
+
+   priv = redis->priv;
 
    if (!redis_client_connect_finish(client, result, &error)) {
       g_warning("Failed to connect to Redis: %s", error->message);
@@ -47,36 +89,50 @@ postal_redis_connect_cb (GObject      *object,
       EXIT;
    }
 
-   g_message("Connected to redis at %s:%u", gRedisHost, gRedisPort);
+   g_message("Connected to redis at %s:%u", priv->host, priv->port);
 
    EXIT;
 }
 
-void
-postal_redis_init (GKeyFile *key_file)
+static void
+postal_redis_start (NeoServiceBase *service,
+                    GKeyFile       *config)
 {
-   gchar *host;
-   gchar *channel;
+   PostalRedisPrivate *priv;
+   PostalRedis *redis = (PostalRedis *)service;
+   gchar *str;
    guint port;
 
    ENTRY;
 
-   if (key_file) {
-      if (g_key_file_get_boolean(key_file, "redis", "enabled", NULL)) {
-         port = g_key_file_get_integer(key_file, "redis", "port", NULL);
-         host = g_key_file_get_string(key_file, "redis", "host", NULL);
-         channel = g_key_file_get_string(key_file, "redis", "channel", NULL);
+   g_assert(POSTAL_IS_REDIS(redis));
 
-         gRedisChannel = channel ?: g_strdup("events");
-         gRedisHost = host ?: g_strdup("localhost");
-         gRedisPort = port ?: 6379;
+   priv = redis->priv;
 
-         gRedisClient = redis_client_new();
-         redis_client_connect_async(gRedisClient,
-                                    host,
-                                    port,
-                                    postal_redis_connect_cb,
-                                    NULL);
+   if (config) {
+      if (g_key_file_get_boolean(config, "redis", "enabled", NULL)) {
+         str = g_key_file_get_string(config, "redis", "host", NULL);
+         postal_redis_set_host(redis, str);
+         g_free(str);
+
+         str = g_key_file_get_string(config, "redis", "channel", NULL);
+         str = str ?: g_strdup("localhost");
+         postal_redis_set_channel(redis, str);
+         g_free(str);
+
+         port = g_key_file_get_integer(config, "redis", "port", NULL);
+         postal_redis_set_port(redis, port ?: 6379);
+
+         g_clear_object(&priv->redis);
+
+         if (priv->host && priv->port) {
+            priv->redis = redis_client_new();
+            redis_client_connect_async(priv->redis,
+                                       priv->host,
+                                       priv->port,
+                                       postal_redis_connect_cb,
+                                       NULL);
+         }
       }
    }
 
@@ -84,22 +140,9 @@ postal_redis_init (GKeyFile *key_file)
 }
 
 static void
-postal_redis_publish_cb (GObject      *object,
-                         GAsyncResult *result,
-                         gpointer      user_data)
+postal_redis_stop (NeoServiceBase *service)
 {
-   RedisClient *client = (RedisClient *)object;
-   GError *error = NULL;
-
    ENTRY;
-
-   g_assert(REDIS_IS_CLIENT(client));
-   g_assert(G_IS_ASYNC_RESULT(result));
-   g_assert(!user_data);
-
-   if (!redis_client_publish_finish(client, result, &error)) {
-      g_warning("%s", error->message);
-   }
 
    EXIT;
 }
@@ -134,19 +177,45 @@ postal_redis_build_message (PostalDevice *device,
    return ret;
 }
 
-void
-postal_redis_device_added (PostalDevice *device)
+static void
+postal_redis_publish_cb (GObject      *object,
+                         GAsyncResult *result,
+                         gpointer      user_data)
 {
+   RedisClient *client = (RedisClient *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_assert(REDIS_IS_CLIENT(client));
+   g_assert(G_IS_ASYNC_RESULT(result));
+   g_assert(!user_data);
+
+   if (!redis_client_publish_finish(client, result, &error)) {
+      g_warning("%s", error->message);
+   }
+
+   EXIT;
+}
+
+void
+postal_redis_device_added (PostalRedis  *redis,
+                           PostalDevice *device)
+{
+   PostalRedisPrivate *priv;
    gchar *message = NULL;
 
    ENTRY;
 
+   g_return_if_fail(POSTAL_IS_REDIS(redis));
    g_return_if_fail(POSTAL_IS_DEVICE(device));
 
-   if (gRedisClient) {
+   priv = redis->priv;
+
+   if (priv->redis) {
       message = postal_redis_build_message(device, "device-added");
-      redis_client_publish_async(gRedisClient,
-                                 gRedisChannel,
+      redis_client_publish_async(priv->redis,
+                                 priv->channel,
                                  message,
                                  -1,
                                  postal_redis_publish_cb,
@@ -158,18 +227,23 @@ postal_redis_device_added (PostalDevice *device)
 }
 
 void
-postal_redis_device_removed (PostalDevice *device)
+postal_redis_device_removed (PostalRedis  *redis,
+                             PostalDevice *device)
 {
+   PostalRedisPrivate *priv;
    gchar *message = NULL;
 
    ENTRY;
 
+   g_return_if_fail(POSTAL_IS_REDIS(redis));
    g_return_if_fail(POSTAL_IS_DEVICE(device));
 
-   if (gRedisClient) {
+   priv = redis->priv;
+
+   if (priv->redis) {
       message = postal_redis_build_message(device, "device-removed");
-      redis_client_publish_async(gRedisClient,
-                                 gRedisChannel,
+      redis_client_publish_async(priv->redis,
+                                 priv->channel,
                                  message,
                                  -1,
                                  postal_redis_publish_cb,
@@ -181,18 +255,23 @@ postal_redis_device_removed (PostalDevice *device)
 }
 
 void
-postal_redis_device_updated (PostalDevice *device)
+postal_redis_device_updated (PostalRedis  *redis,
+                             PostalDevice *device)
 {
+   PostalRedisPrivate *priv;
    gchar *message = NULL;
 
    ENTRY;
 
+   g_return_if_fail(POSTAL_IS_REDIS(redis));
    g_return_if_fail(POSTAL_IS_DEVICE(device));
 
-   if (gRedisClient) {
+   priv = redis->priv;
+
+   if (priv->redis) {
       message = postal_redis_build_message(device, "device-updated");
-      redis_client_publish_async(gRedisClient,
-                                 gRedisChannel,
+      redis_client_publish_async(priv->redis,
+                                 priv->channel,
                                  message,
                                  -1,
                                  postal_redis_publish_cb,
@@ -204,24 +283,76 @@ postal_redis_device_updated (PostalDevice *device)
 }
 
 void
-postal_redis_device_notified (PostalDevice *device)
+postal_redis_device_notified (PostalRedis  *redis,
+                              PostalDevice *device)
 {
+   PostalRedisPrivate *priv;
    gchar *message = NULL;
 
    ENTRY;
 
+   g_return_if_fail(POSTAL_IS_REDIS(redis));
    g_return_if_fail(POSTAL_IS_DEVICE(device));
 
-   if (gRedisClient) {
+   priv = redis->priv;
+
+   if (priv->redis) {
       message = postal_redis_build_message(device, "device-notified");
-      redis_client_publish_async(gRedisClient,
-                                 gRedisChannel,
+      redis_client_publish_async(priv->redis,
+                                 priv->channel,
                                  message,
                                  -1,
                                  postal_redis_publish_cb,
                                  NULL);
       g_free(message);
    }
+
+   EXIT;
+}
+
+static void
+postal_redis_finalize (GObject *object)
+{
+   PostalRedisPrivate *priv;
+
+   priv = POSTAL_REDIS(object)->priv;
+
+   g_clear_object(&priv->redis);
+   g_free(priv->channel);
+   g_free(priv->host);
+
+   G_OBJECT_CLASS(postal_redis_parent_class)->finalize(object);
+}
+
+static void
+postal_redis_class_init (PostalRedisClass *klass)
+{
+   GObjectClass *object_class;
+   NeoServiceBaseClass *service_base_class;
+
+   ENTRY;
+
+   object_class = G_OBJECT_CLASS(klass);
+   object_class->finalize = postal_redis_finalize;
+   g_type_class_add_private(object_class, sizeof(PostalRedisPrivate));
+
+   service_base_class = NEO_SERVICE_BASE_CLASS(klass);
+   service_base_class->start = postal_redis_start;
+   service_base_class->stop = postal_redis_stop;
+
+   EXIT;
+}
+
+static void
+postal_redis_init (PostalRedis *redis)
+{
+   ENTRY;
+
+   redis->priv =
+      G_TYPE_INSTANCE_GET_PRIVATE(redis,
+                                  POSTAL_TYPE_REDIS,
+                                  PostalRedisPrivate);
+   g_object_set(redis, "name", "redis", NULL);
 
    EXIT;
 }

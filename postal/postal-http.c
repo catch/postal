@@ -35,15 +35,24 @@
 #undef G_LOG_DOMAIN
 #define G_LOG_DOMAIN "http"
 
-G_DEFINE_TYPE(PostalHttp, postal_http, NEO_TYPE_SERVICE)
+G_DEFINE_TYPE(PostalHttp, postal_http, NEO_TYPE_SERVICE_BASE)
 
 struct _PostalHttpPrivate
 {
-   gboolean    started;
-   NeoLogger  *logger;
-   UrlRouter  *router;
-   SoupServer *server;
+   gboolean       started;
+   NeoLogger     *logger;
+   UrlRouter     *router;
+   SoupServer    *server;
+   PostalService *service;
 };
+
+PostalHttp *
+postal_http_new (void)
+{
+   return g_object_new(POSTAL_TYPE_HTTP,
+                       "name", "http",
+                       NULL);
+}
 
 static guint
 get_int_param (GHashTable  *hashtable,
@@ -413,7 +422,7 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
    user = g_hash_table_lookup(params, "user");
 
    if (message->method == SOUP_METHOD_GET) {
-      postal_service_find_device(POSTAL_SERVICE_DEFAULT,
+      postal_service_find_device(http->priv->service,
                                  user,
                                  device,
                                  NULL, /* TODO */
@@ -426,7 +435,7 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
                           "device-token", device,
                           "user", user,
                           NULL);
-      postal_service_remove_device(POSTAL_SERVICE_DEFAULT,
+      postal_service_remove_device(http->priv->service,
                                    pdev,
                                    NULL, /* TODO */
                                    postal_http_remove_device_cb,
@@ -459,7 +468,7 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
                              "device",
                              g_object_ref(pdev),
                              g_object_unref);
-      postal_service_add_device(POSTAL_SERVICE_DEFAULT,
+      postal_service_add_device(http->priv->service,
                                 pdev,
                                 NULL, /* TODO */
                                 postal_http_add_device_cb,
@@ -537,7 +546,7 @@ postal_http_handle_v1_users_user_devices (UrlRouter         *router,
    soup_server_pause_message(server, message);
 
    if (message->method == SOUP_METHOD_GET) {
-      postal_service_find_devices(POSTAL_SERVICE_DEFAULT,
+      postal_service_find_devices(http->priv->service,
                                   user,
                                   get_int_param(query, "offset"),
                                   get_int_param(query, "limit"),
@@ -692,7 +701,7 @@ postal_http_handle_v1_notify (UrlRouter         *router,
       }
    }
 
-   postal_service_notify(POSTAL_SERVICE_DEFAULT,
+   postal_service_notify(http->priv->service,
                          notif,
                          (gchar **)users_ptr->pdata,
                          (MongoObjectId **)devices_ptr->pdata,
@@ -834,27 +843,28 @@ postal_http_request_finished (SoupServer        *server,
 }
 
 static void
-postal_http_start (NeoService *service)
+postal_http_start (NeoServiceBase *base,
+                   GKeyFile       *config)
 {
    PostalHttpPrivate *priv;
-   GKeyFile *config;
    gboolean nologging = FALSE;
    gchar *logfile = NULL;
    guint port = 0;
 
    ENTRY;
 
-   g_assert(POSTAL_IS_HTTP(service));
+   g_assert(POSTAL_IS_HTTP(base));
 
-   priv = POSTAL_HTTP(service)->priv;
-
-   config = neo_service_get_config(service);
+   priv = POSTAL_HTTP(base)->priv;
 
    if (config) {
       port = g_key_file_get_integer(config, "http", "port", NULL);
       logfile = g_key_file_get_string(config, "http", "logfile", NULL);
       nologging = g_key_file_get_boolean(config, "http", "nologging", NULL);
    }
+
+   priv->service = POSTAL_SERVICE(neo_service_get_peer(NEO_SERVICE(base),
+                                                       "service"));
 
    priv->server = soup_server_new(SOUP_SERVER_PORT, port ?: 5300,
                                   SOUP_SERVER_SERVER_HEADER, "Postal/"VERSION,
@@ -866,25 +876,29 @@ postal_http_start (NeoService *service)
       g_signal_connect(priv->server,
                        "request-finished",
                        G_CALLBACK(postal_http_request_finished),
-                       service);
+                       base);
    }
 
    soup_server_add_handler(priv->server,
                            NULL,
                            postal_http_router,
-                           service,
+                           base,
                            NULL);
 
    soup_server_run_async(priv->server);
 
    g_free(logfile);
+
+   EXIT;
 }
 
 static void
-postal_http_stop (NeoService *service)
+postal_http_stop (NeoServiceBase *base)
 {
    PostalHttpPrivate *priv;
-   PostalHttp *http = (PostalHttp *)service;
+   PostalHttp *http = (PostalHttp *)base;
+
+   ENTRY;
 
    g_assert(POSTAL_IS_HTTP(http));
 
@@ -894,6 +908,8 @@ postal_http_stop (NeoService *service)
       soup_server_quit(priv->server);
       g_clear_object(&priv->server);
    }
+
+   EXIT;
 }
 
 static void
@@ -916,15 +932,15 @@ static void
 postal_http_class_init (PostalHttpClass *klass)
 {
    GObjectClass *object_class;
-   NeoServiceClass *service_class;
+   NeoServiceBaseClass *base_class;
 
    object_class = G_OBJECT_CLASS(klass);
    object_class->finalize = postal_http_finalize;
    g_type_class_add_private(object_class, sizeof(PostalHttpPrivate));
 
-   service_class = NEO_SERVICE_CLASS(klass);
-   service_class->start = postal_http_start;
-   service_class->stop = postal_http_stop;
+   base_class = NEO_SERVICE_BASE_CLASS(klass);
+   base_class->start = postal_http_start;
+   base_class->stop = postal_http_stop;
 }
 
 static void
@@ -934,8 +950,6 @@ postal_http_init (PostalHttp *http)
       G_TYPE_INSTANCE_GET_PRIVATE(http,
                                   POSTAL_TYPE_HTTP,
                                   PostalHttpPrivate);
-
-   neo_service_set_name(NEO_SERVICE(http), "http");
 
    http->priv->router = url_router_new();
    url_router_add_handler(http->priv->router,

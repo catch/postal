@@ -14,11 +14,11 @@ test_postal_device_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mon
 test_postal_device_LDADD = libpostal.la
 
 test_postal_http_SOURCES = tests/test-postal-http.c
-test_postal_http_CPPFLAGS = -I$(top_srcdir) $(GIO_CFLAGS) $(JSON_CFLAGS) $(SOUP_CFLAGS)
+test_postal_http_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/neo $(GIO_CFLAGS) $(JSON_CFLAGS) $(SOUP_CFLAGS)
 test_postal_http_LDADD = libpostal.la
 
 test_postal_service_SOURCES = tests/test-postal-service.c
-test_postal_service_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib
+test_postal_service_CPPFLAGS = $(JSON_CFLAGS) -I$(top_srcdir) -I$(top_srcdir)/mongo-glib -I$(top_srcdir)/neo
 test_postal_service_LDADD = libpostal.la
 
 test_url_router_SOURCES = tests/test-url-router.c

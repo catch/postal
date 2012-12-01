@@ -21,6 +21,7 @@
 
 #include <glib-object.h>
 #include <mongo-glib.h>
+#include <neo.h>
 
 #include "postal-device.h"
 #include "postal-notification.h"
@@ -42,7 +43,7 @@ typedef struct _PostalServicePrivate PostalServicePrivate;
 
 struct _PostalService
 {
-   GObject parent;
+   NeoServiceBase parent;
 
    /*< private >*/
    PostalServicePrivate *priv;
@@ -50,7 +51,7 @@ struct _PostalService
 
 struct _PostalServiceClass
 {
-   GObjectClass parent_class;
+   NeoServiceBaseClass parent_class;
 };
 
 GKeyFile      *postal_service_get_config           (PostalService        *service);
@@ -84,6 +85,7 @@ void           postal_service_find_devices         (PostalService        *servic
 GPtrArray     *postal_service_find_devices_finish  (PostalService        *service,
                                                     GAsyncResult         *result,
                                                     GError              **error);
+PostalService *postal_service_new                  (void);
 void           postal_service_remove_device        (PostalService        *service,
                                                     PostalDevice         *device,
                                                     GCancellable         *cancellable,
@@ -94,7 +96,6 @@ gboolean       postal_service_remove_device_finish (PostalService        *servic
                                                     GError              **error);
 void           postal_service_set_config           (PostalService        *service,
                                                     GKeyFile             *config);
-void           postal_service_start                (PostalService        *service);
 void           postal_service_notify               (PostalService        *service,
                                                     PostalNotification   *notification,
                                                     gchar               **users,

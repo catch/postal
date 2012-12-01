@@ -32,7 +32,10 @@ main (gint   argc,
    g_set_prgname("Postal");
    g_set_application_name(_("PostalD"));
 
-   application = POSTAL_APPLICATION_DEFAULT;
+   application = g_object_new(POSTAL_TYPE_APPLICATION,
+                              "application-id", "com.catch.postald",
+                              "flags", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_COMMAND_LINE,
+                              NULL);
    g_application_set_default(G_APPLICATION(application));
    ret = g_application_run(G_APPLICATION(application), argc, argv);
    g_clear_object(&application);

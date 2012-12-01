@@ -29,64 +29,28 @@
 #endif
 #include "postal-service.h"
 
-G_DEFINE_TYPE(PostalService, postal_service, G_TYPE_OBJECT)
+G_DEFINE_TYPE(PostalService, postal_service, NEO_TYPE_SERVICE_BASE)
 
 struct _PostalServicePrivate
 {
    PushApsClient   *aps;
    PushC2dmClient  *c2dm;
    PushGcmClient   *gcm;
-   GKeyFile        *config;
    gchar           *db_and_collection;
    gchar           *db;
    gchar           *collection;
    MongoConnection *mongo;
+#ifdef ENABLE_REDIS
+   PostalRedis     *redis;
+#endif
 };
 
-enum
-{
-   PROP_0,
-   PROP_CONFIG,
-   LAST_PROP
-};
-
-static GParamSpec *gParamSpecs[LAST_PROP];
-
-/**
- * postal_service_get_default:
- *
- * Fetches the default instance of #PostalService. This is the singleton
- * instance that should be used throughout the life of the process.
- *
- * Returns: (transfer none): A #PostalService.
- */
 PostalService *
-postal_service_get_default (void)
+postal_service_new (void)
 {
-   static PostalService *service;
-   PostalService *instance;
-
-   if (g_once_init_enter(&service)) {
-      instance = g_object_new(POSTAL_TYPE_SERVICE, NULL);
-      g_once_init_leave(&service, instance);
-   }
-
-   return service;
-}
-
-/**
- * postal_service_get_config:
- * @service: (in): A #PostalService.
- *
- * Fetch the configuration being used by the #PostalService instance.
- *
- * Returns: (transfer none): A #GKeyFile.
- */
-GKeyFile *
-postal_service_get_config (PostalService *service)
-{
-   g_return_val_if_fail(POSTAL_IS_SERVICE(service), NULL);
-   return service->priv->config;
+   return g_object_new(POSTAL_TYPE_SERVICE,
+                       "name", "service",
+                       NULL);
 }
 
 static void
@@ -113,10 +77,13 @@ postal_service_add_device_cb (GObject      *object,
       g_simple_async_result_take_error(simple, error);
 #ifdef ENABLE_REDIS
    } else {
+      PostalService *service;
       PostalDevice *device;
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
-      postal_redis_device_added(device);
+      service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
+      postal_redis_device_added(service->priv->redis, device);
+      g_object_unref(service);
 #endif
    }
 
@@ -298,10 +265,13 @@ postal_service_remove_device_cb (GObject      *object,
       g_simple_async_result_take_error(simple, error);
 #ifdef ENABLE_REDIS
    } else {
+      PostalService *service;
       PostalDevice *device;
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
-      postal_redis_device_removed(device);
+      service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
+      postal_redis_device_removed(service->priv->redis, device);
+      g_object_unref(service);
 #endif
    }
 
@@ -967,6 +937,7 @@ postal_service_notify_cb (GObject      *object,
    MongoBsonIter iter;
    const gchar *device_type;
    const gchar *device_token;
+   GObject *source;
    GError *error = NULL;
    GList *gcm_devices = NULL;
    GList *list;
@@ -976,7 +947,9 @@ postal_service_notify_cb (GObject      *object,
    g_assert(MONGO_IS_CONNECTION(connection));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   priv = POSTAL_SERVICE_DEFAULT->priv;
+   source = g_async_result_get_source_object(user_data);
+   priv = POSTAL_SERVICE(source)->priv;
+   g_object_unref(source);
 
    if (!(reply = mongo_connection_query_finish(connection, result, &error))) {
       g_simple_async_result_take_error(simple, error);
@@ -1413,37 +1386,6 @@ postal_service_gcm_identity_removed (PostalService   *service,
 }
 
 /**
- * postal_service_set_config:
- * @service: (in): A #PostalService.
- * @config: (in): A #GKeyFile.
- *
- * Sets the #GKeyFile to use for configuration of the service.
- */
-void
-postal_service_set_config (PostalService *service,
-                           GKeyFile      *config)
-{
-   PostalServicePrivate *priv;
-
-   ENTRY;
-
-   g_return_if_fail(POSTAL_IS_SERVICE(service));
-
-   priv = service->priv;
-
-   if (priv->config) {
-      g_key_file_unref(priv->config);
-      priv->config = NULL;
-   }
-   if (config) {
-      priv->config = g_key_file_ref(config);
-   }
-   g_object_notify_by_pspec(G_OBJECT(service), gParamSpecs[PROP_CONFIG]);
-
-   EXIT;
-}
-
-/**
  * postal_service_start:
  * @service: A #PostalService.
  *
@@ -1451,10 +1393,12 @@ postal_service_set_config (PostalService *service,
  * as communication to Apple's push service.
  */
 void
-postal_service_start (PostalService *service)
+postal_service_start (NeoServiceBase *base,
+                      GKeyFile       *config)
 {
    PostalServicePrivate *priv;
    PushApsClientMode aps_mode;
+   PostalService *service = (PostalService *)base;
    gchar *c2dm_auth_token = NULL;
    gchar *gcm_auth_token = NULL;
    gchar *ssl_cert_file = NULL;
@@ -1478,12 +1422,12 @@ postal_service_start (PostalService *service)
    ssl_key_file = NULL;
    feedback_interval_sec = 10;
 
-#define GET_STRING_KEY(g,n) g_key_file_get_string(priv->config, g, n, NULL)
+#define GET_STRING_KEY(g,n) g_key_file_get_string(config, g, n, NULL)
    /*
     * Apply configuration.
     */
-   if (priv->config) {
-      if (g_key_file_get_boolean(priv->config, "aps", "sandbox", NULL)) {
+   if (config) {
+      if (g_key_file_get_boolean(config, "aps", "sandbox", NULL)) {
          aps_mode = PUSH_APS_CLIENT_SANDBOX;
       }
 
@@ -1520,6 +1464,9 @@ postal_service_start (PostalService *service)
                             NULL);
    priv->mongo = mongo_connection_new_from_uri(uri);
 
+#ifdef ENABLE_REDIS
+   priv->redis = POSTAL_REDIS(neo_service_get_peer(NEO_SERVICE(service), "redis"));
+#endif
 
    g_signal_connect_swapped(priv->aps,
                             "identity-removed",
@@ -1558,71 +1505,25 @@ postal_service_finalize (GObject *object)
    g_clear_object(&priv->c2dm);
    g_clear_object(&priv->mongo);
 
-   if (priv->config) {
-      g_key_file_unref(priv->config);
-      priv->config = NULL;
-   }
-
    G_OBJECT_CLASS(postal_service_parent_class)->finalize(object);
 
    EXIT;
 }
 
 static void
-postal_service_get_property (GObject    *object,
-                             guint       prop_id,
-                             GValue     *value,
-                             GParamSpec *pspec)
-{
-   PostalService *service = POSTAL_SERVICE(object);
-
-   switch (prop_id) {
-   case PROP_CONFIG:
-      g_value_set_boxed(value, postal_service_get_config(service));
-      break;
-   default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
-   }
-}
-
-static void
-postal_service_set_property (GObject      *object,
-                             guint         prop_id,
-                             const GValue *value,
-                             GParamSpec   *pspec)
-{
-   PostalService *service = POSTAL_SERVICE(object);
-
-   switch (prop_id) {
-   case PROP_CONFIG:
-      postal_service_set_config(service, g_value_get_boxed(value));
-      break;
-   default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
-   }
-}
-
-static void
 postal_service_class_init (PostalServiceClass *klass)
 {
    GObjectClass *object_class;
+   NeoServiceBaseClass *service_base_class;
 
    ENTRY;
 
    object_class = G_OBJECT_CLASS(klass);
    object_class->finalize = postal_service_finalize;
-   object_class->get_property = postal_service_get_property;
-   object_class->set_property = postal_service_set_property;
    g_type_class_add_private(object_class, sizeof(PostalServicePrivate));
 
-   gParamSpecs[PROP_CONFIG] =
-      g_param_spec_boxed("config",
-                         _("Config"),
-                         _("A GKeyFile containing the configuration."),
-                         G_TYPE_KEY_FILE,
-                         G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
-   g_object_class_install_property(object_class, PROP_CONFIG,
-                                   gParamSpecs[PROP_CONFIG]);
+   service_base_class = NEO_SERVICE_BASE_CLASS(klass);
+   service_base_class->start = postal_service_start;
 
    EXIT;
 }

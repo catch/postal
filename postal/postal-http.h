@@ -19,7 +19,7 @@
 #ifndef POSTAL_HTTP_H
 #define POSTAL_HTTP_H
 
-#include <neo-service.h>
+#include <neo.h>
 
 G_BEGIN_DECLS
 
@@ -37,7 +37,7 @@ typedef struct _PostalHttpPrivate PostalHttpPrivate;
 
 struct _PostalHttp
 {
-   NeoService parent;
+   NeoServiceBase parent;
 
    /*< private >*/
    PostalHttpPrivate *priv;
@@ -45,10 +45,11 @@ struct _PostalHttp
 
 struct _PostalHttpClass
 {
-   NeoServiceClass parent_class;
+   NeoServiceBaseClass parent_class;
 };
 
-GType postal_http_get_type (void) G_GNUC_CONST;
+GType       postal_http_get_type (void) G_GNUC_CONST;
+PostalHttp *postal_http_new      (void);
 
 G_END_DECLS
 

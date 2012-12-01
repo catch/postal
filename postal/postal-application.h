@@ -20,11 +20,11 @@
 #define POSTAL_APPLICATION_H
 
 #include <gio/gio.h>
+#include <neo.h>
 
 G_BEGIN_DECLS
 
 #define POSTAL_TYPE_APPLICATION            (postal_application_get_type())
-#define POSTAL_APPLICATION_DEFAULT         (postal_application_get_default())
 #define POSTAL_APPLICATION(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_APPLICATION, PostalApplication))
 #define POSTAL_APPLICATION_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_APPLICATION, PostalApplication const))
 #define POSTAL_APPLICATION_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  POSTAL_TYPE_APPLICATION, PostalApplicationClass))
@@ -38,7 +38,7 @@ typedef struct _PostalApplicationPrivate PostalApplicationPrivate;
 
 struct _PostalApplication
 {
-   GApplication parent;
+   NeoApplication parent;
 
    /*< private >*/
    PostalApplicationPrivate *priv;
@@ -46,11 +46,12 @@ struct _PostalApplication
 
 struct _PostalApplicationClass
 {
-   GApplicationClass parent_class;
+   NeoApplicationClass parent_class;
 };
 
-PostalApplication *postal_application_get_default (void);
-GType              postal_application_get_type    (void) G_GNUC_CONST;
+GType postal_application_get_type   (void) G_GNUC_CONST;
+void  postal_application_set_config (PostalApplication *application,
+                                     GKeyFile          *config);
 
 G_END_DECLS
 

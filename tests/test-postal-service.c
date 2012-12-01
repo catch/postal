@@ -1,8 +1,10 @@
+#include <postal/postal-application.h>
 #include <postal/postal-service.h>
 
-static GMainLoop   *gMainLoop;
-static gboolean     gSuccess;
-static const gchar  gKeyData[] =
+static GApplication *gApp;
+static GMainLoop    *gMainLoop;
+static gboolean      gSuccess;
+static const gchar   gKeyData[] =
    "[mongo]\n"
    "uri = mongodb://127.0.0.1:27017/?w=1&fsync=true\n"
    "db = test\n"
@@ -109,16 +111,21 @@ test1 (void)
 
    gSuccess = FALSE;
    key_file = g_key_file_new();
-   g_key_file_load_from_data(key_file, gKeyData, -1, 0, NULL);
-   service = POSTAL_SERVICE_DEFAULT;
-   postal_service_set_config(service, key_file);
-   postal_service_start(service);
+   g_assert(g_key_file_load_from_data(key_file, gKeyData, -1, 0, NULL));
+   gApp = g_object_new(POSTAL_TYPE_APPLICATION,
+                       "application-id", "com.catch.postald.service-tests",
+                       "flags", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_COMMAND_LINE,
+                       NULL);
+   neo_application_set_config(NEO_APPLICATION(gApp), key_file);
+   service = POSTAL_SERVICE(neo_service_get_child(NEO_SERVICE(gApp), "service"));
+   g_assert(POSTAL_IS_SERVICE(service));
    device = postal_device_new();
    rand_str = g_strdup_printf("%u", g_random_int());
    postal_device_set_device_token(device, rand_str);
    g_free(rand_str);
    postal_device_set_user(device, "000011110000111100001111");
    postal_device_set_device_type(device, "c2dm");
+   neo_service_start(NEO_SERVICE(gApp), NULL);
    postal_service_add_device(service, device, NULL, test1_cb, device);
    g_main_loop_run(gMainLoop);
    g_object_unref(device);
@@ -131,8 +138,8 @@ main (gint   argc,
 {
    g_setenv("GSETTINGS_BACKEND", "memory", FALSE);
    g_type_init();
-   gMainLoop = g_main_loop_new(NULL, FALSE);
    g_test_init(&argc, &argv, NULL);
+   gMainLoop = g_main_loop_new(NULL, FALSE);
    g_test_add_func("/Postal/Service/add_update_remove_find", test1);
    return g_test_run();
 }

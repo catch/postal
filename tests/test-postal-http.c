@@ -25,9 +25,9 @@ application_new (const gchar *name)
    app_name = g_strdup_printf("com.catch.postald.http.%s", name);
    app = g_object_new(POSTAL_TYPE_APPLICATION,
                       "application-id", app_name,
-                      "config", gKeyFile,
                       "flags", G_APPLICATION_HANDLES_COMMAND_LINE | G_APPLICATION_NON_UNIQUE,
                       NULL);
+   neo_application_set_config(NEO_APPLICATION(app), gKeyFile);
    g_free(app_name);
 
    return app;
