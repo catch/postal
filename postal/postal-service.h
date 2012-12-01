@@ -29,7 +29,6 @@
 G_BEGIN_DECLS
 
 #define POSTAL_TYPE_SERVICE            (postal_service_get_type())
-#define POSTAL_SERVICE_DEFAULT         (postal_service_get_default())
 #define POSTAL_SERVICE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_SERVICE, PostalService))
 #define POSTAL_SERVICE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), POSTAL_TYPE_SERVICE, PostalService const))
 #define POSTAL_SERVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  POSTAL_TYPE_SERVICE, PostalServiceClass))
@@ -55,7 +54,6 @@ struct _PostalServiceClass
 };
 
 GKeyFile      *postal_service_get_config           (PostalService        *service);
-PostalService *postal_service_get_default          (void) G_GNUC_CONST;
 GType          postal_service_get_type             (void) G_GNUC_CONST;
 void           postal_service_add_device           (PostalService        *service,
                                                     PostalDevice         *device,
