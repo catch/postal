@@ -129,6 +129,7 @@ gint
 main (gint   argc,
       gchar *argv[])
 {
+   g_setenv("GSETTINGS_BACKEND", "memory", FALSE);
    g_type_init();
    gMainLoop = g_main_loop_new(NULL, FALSE);
    g_test_init(&argc, &argv, NULL);
