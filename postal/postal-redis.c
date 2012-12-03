@@ -131,7 +131,7 @@ postal_redis_start (NeoServiceBase *service,
                                        priv->host,
                                        priv->port,
                                        postal_redis_connect_cb,
-                                       NULL);
+                                       redis);
          }
       }
    }
