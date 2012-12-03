@@ -49,9 +49,7 @@ struct _PostalApplicationClass
    NeoApplicationClass parent_class;
 };
 
-GType postal_application_get_type   (void) G_GNUC_CONST;
-void  postal_application_set_config (PostalApplication *application,
-                                     GKeyFile          *config);
+GType postal_application_get_type (void) G_GNUC_CONST;
 
 G_END_DECLS
 
