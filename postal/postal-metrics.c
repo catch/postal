@@ -19,6 +19,7 @@
  *    Christian Hergert <christian@catch.com>
  */
 
+#include <push-glib.h>
 #include <glib/gi18n.h>
 
 #include "postal-debug.h"
@@ -38,6 +39,9 @@ struct _PostalMetricsPrivate
    guint64 devices_added;
    guint64 devices_removed;
    guint64 devices_updated;
+   guint64 aps_notified;
+   guint64 c2dm_notified;
+   guint64 gcm_notified;
 };
 
 enum
@@ -46,6 +50,9 @@ enum
    PROP_DEVICES_ADDED,
    PROP_DEVICES_REMOVED,
    PROP_DEVICES_UPDATED,
+   PROP_APS_NOTIFIED,
+   PROP_C2DM_NOTIFIED,
+   PROP_GCM_NOTIFIED,
    LAST_PROP
 };
 
@@ -57,27 +64,6 @@ postal_metrics_new (void)
    return g_object_new(POSTAL_TYPE_METRICS,
                        "name", "metrics",
                        NULL);
-}
-
-guint64
-postal_metrics_get_devices_added (PostalMetrics *metrics)
-{
-   g_return_val_if_fail(POSTAL_IS_METRICS(metrics), 0);
-   return metrics->priv->devices_added;
-}
-
-guint64
-postal_metrics_get_devices_removed (PostalMetrics *metrics)
-{
-   g_return_val_if_fail(POSTAL_IS_METRICS(metrics), 0);
-   return metrics->priv->devices_removed;
-}
-
-guint64
-postal_metrics_get_devices_updated (PostalMetrics *metrics)
-{
-   g_return_val_if_fail(POSTAL_IS_METRICS(metrics), 0);
-   return metrics->priv->devices_updated;
 }
 
 void
@@ -113,6 +99,36 @@ postal_metrics_device_updated (PostalMetrics *metrics,
    __sync_fetch_and_add(&metrics->priv->devices_updated, 1);
 #ifdef ENABLE_REDIS
    postal_redis_device_updated(metrics->priv->redis, device);
+#endif
+}
+
+void
+postal_metrics_device_notified (PostalMetrics *metrics,
+                                PostalDevice  *device)
+{
+   PostalMetricsPrivate *priv;
+   const gchar *device_type;
+
+   g_return_if_fail(POSTAL_IS_METRICS(metrics));
+
+   priv = metrics->priv;
+
+   /*
+    * XXX: Make device-type an enum for jumptables.
+    */
+
+   device_type = postal_device_get_device_type(device);
+
+   if (!g_strcmp0(device_type, "aps")) {
+      __sync_fetch_and_add(&priv->aps_notified, 1);
+   } else if (!g_strcmp0(device_type, "c2dm")) {
+      __sync_fetch_and_add(&priv->c2dm_notified, 1);
+   } else if (!g_strcmp0(device_type, "gcm")) {
+      __sync_fetch_and_add(&priv->gcm_notified, 1);
+   }
+
+#ifdef ENABLE_REDIS
+   postal_redis_device_notified(metrics->priv->redis, device);
 #endif
 }
 
@@ -157,14 +173,23 @@ postal_metrics_get_property (GObject    *object,
    PostalMetrics *metrics = POSTAL_METRICS(object);
 
    switch (prop_id) {
+   case PROP_APS_NOTIFIED:
+      g_value_set_uint64(value, metrics->priv->aps_notified);
+      break;
+   case PROP_C2DM_NOTIFIED:
+      g_value_set_uint64(value, metrics->priv->c2dm_notified);
+      break;
    case PROP_DEVICES_ADDED:
-      g_value_set_uint64(value, postal_metrics_get_devices_added(metrics));
+      g_value_set_uint64(value, metrics->priv->devices_added);
       break;
    case PROP_DEVICES_REMOVED:
-      g_value_set_uint64(value, postal_metrics_get_devices_removed(metrics));
+      g_value_set_uint64(value, metrics->priv->devices_removed);
       break;
    case PROP_DEVICES_UPDATED:
-      g_value_set_uint64(value, postal_metrics_get_devices_updated(metrics));
+      g_value_set_uint64(value, metrics->priv->devices_updated);
+      break;
+   case PROP_GCM_NOTIFIED:
+      g_value_set_uint64(value, metrics->priv->gcm_notified);
       break;
    default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
@@ -184,6 +209,28 @@ postal_metrics_class_init (PostalMetricsClass *klass)
 
    base_class = NEO_SERVICE_BASE_CLASS(klass);
    base_class->start = postal_metrics_start;
+
+   gParamSpecs[PROP_APS_NOTIFIED] =
+      g_param_spec_uint64("aps-notified",
+                          _("Gcm Notified"),
+                          _("Number of APS devices notified."),
+                          0,
+                          G_MAXUINT64,
+                          0,
+                          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_APS_NOTIFIED,
+                                   gParamSpecs[PROP_APS_NOTIFIED]);
+
+   gParamSpecs[PROP_C2DM_NOTIFIED] =
+      g_param_spec_uint64("c2dm-notified",
+                          _("C2dm Notified"),
+                          _("Number of C2DM devices notified."),
+                          0,
+                          G_MAXUINT64,
+                          0,
+                          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_C2DM_NOTIFIED,
+                                   gParamSpecs[PROP_C2DM_NOTIFIED]);
 
    gParamSpecs[PROP_DEVICES_ADDED] =
       g_param_spec_uint64("devices-added",
@@ -217,6 +264,17 @@ postal_metrics_class_init (PostalMetricsClass *klass)
                           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
    g_object_class_install_property(object_class, PROP_DEVICES_UPDATED,
                                    gParamSpecs[PROP_DEVICES_UPDATED]);
+
+   gParamSpecs[PROP_GCM_NOTIFIED] =
+      g_param_spec_uint64("gcm-notified",
+                          _("Gcm Notified"),
+                          _("Number of GCM devices notified."),
+                          0,
+                          G_MAXUINT64,
+                          0,
+                          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_GCM_NOTIFIED,
+                                   gParamSpecs[PROP_GCM_NOTIFIED]);
 }
 
 static void

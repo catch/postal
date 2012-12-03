@@ -808,14 +808,20 @@ postal_http_handle_status (UrlRouter         *router,
    guint64 devices_added;
    guint64 devices_removed;
    guint64 devices_updated;
+   guint64 aps_notified;
+   guint64 c2dm_notified;
+   guint64 gcm_notified;
    gchar *str;
 
    g_assert(POSTAL_IS_HTTP(http));
 
    g_object_get(http->priv->metrics,
+                "aps-notified", &aps_notified,
+                "c2dm-notified", &c2dm_notified,
                 "devices-added", &devices_added,
                 "devices-removed", &devices_removed,
                 "devices-updated", &devices_updated,
+                "gcm-notified", &gcm_notified,
                 NULL);
    /*
     * XXX: This technically isn't valid JSON since it is limited to
@@ -824,11 +830,19 @@ postal_http_handle_status (UrlRouter         *router,
    str = g_strdup_printf("{\n"
                          "  \"devices_added\": %"G_GUINT64_FORMAT",\n"
                          "  \"devices_removed\": %"G_GUINT64_FORMAT",\n"
-                         "  \"devices_updated\": %"G_GUINT64_FORMAT"\n"
+                         "  \"devices_updated\": %"G_GUINT64_FORMAT",\n"
+                         "  \"devices_notified\": {\n"
+                         "    \"aps\": %"G_GUINT64_FORMAT",\n"
+                         "    \"c2dm\": %"G_GUINT64_FORMAT",\n"
+                         "    \"gcm\": %"G_GUINT64_FORMAT"\n"
+                         "  }\n"
                          "}\n",
                          devices_added,
                          devices_removed,
-                         devices_updated);
+                         devices_updated,
+                         aps_notified,
+                         c2dm_notified,
+                         gcm_notified);
    soup_message_set_status(message, SOUP_STATUS_OK);
    soup_message_set_response(message,
                              "application/json",

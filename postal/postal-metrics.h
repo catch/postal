@@ -53,19 +53,16 @@ struct _PostalMetricsClass
    NeoServiceBaseClass parent_class;
 };
 
-PostalMetrics *postal_metrics_new                 (void);
-GType          postal_metrics_get_type            (void) G_GNUC_CONST;
-guint64        postal_metrics_get_devices_added   (PostalMetrics *metrics);
-guint64        postal_metrics_get_devices_removed (PostalMetrics *metrics);
-guint64        postal_metrics_get_devices_updated (PostalMetrics *metrics);
-void           postal_metrics_device_added        (PostalMetrics *metrics,
-                                                   PostalDevice  *device);
-void           postal_metrics_device_removed      (PostalMetrics *metrics,
-                                                   PostalDevice  *device);
-void           postal_metrics_device_updated      (PostalMetrics *metrics,
-                                                   PostalDevice  *device);
-void           postal_metrics_device_notified     (PostalMetrics *metrics,
-                                                   PostalDevice  *device);
+PostalMetrics *postal_metrics_new             (void);
+GType          postal_metrics_get_type        (void) G_GNUC_CONST;
+void           postal_metrics_device_added    (PostalMetrics *metrics,
+                                               PostalDevice  *device);
+void           postal_metrics_device_removed  (PostalMetrics *metrics,
+                                               PostalDevice  *device);
+void           postal_metrics_device_updated  (PostalMetrics *metrics,
+                                               PostalDevice  *device);
+void           postal_metrics_device_notified (PostalMetrics *metrics,
+                                               PostalDevice  *device);
 
 G_END_DECLS
 
