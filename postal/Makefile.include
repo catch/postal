@@ -27,6 +27,7 @@ libpostal_la_CPPFLAGS += -DSYSCONFDIR="\"${sysconfdir}\""
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/cut-n-paste
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/mongo-glib
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/neo
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/push-glib
 libpostal_la_CPPFLAGS += -I$(top_srcdir)/redis-glib
 libpostal_la_CPPFLAGS += -I$(top_srcdir)
 

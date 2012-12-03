@@ -21,7 +21,7 @@
 #endif
 
 #include <glib/gi18n.h>
-#include <push-glib/push-glib.h>
+#include <push-glib.h>
 
 #include "postal-debug.h"
 #include "postal-metrics.h"
