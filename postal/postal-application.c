@@ -97,16 +97,17 @@ postal_application_command_line (GApplication            *application,
                                              _("Failed to parse config (%s): %s\n"),
                                              config,
                                              error->message);
-         g_key_file_unref(key_file);
          GOTO(cleanup);
       }
       neo_application_set_config(NEO_APPLICATION(application), key_file);
-      g_key_file_unref(key_file);
    }
 
    neo_service_start(NEO_SERVICE(application), NULL);
 
 cleanup:
+   if (key_file) {
+      g_key_file_unref(key_file);
+   }
    g_option_context_free(context);
    g_clear_error(&error);
    g_strfreev(argv);
