@@ -1,7 +1,6 @@
 # Things we need immediately.
 
  * Delay of notification delivery.
- * Add /status HTTP page.
  * Python drivers for twisted and urllib.
 
 # Things that would be nice.
