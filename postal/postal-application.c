@@ -82,6 +82,10 @@ postal_application_command_line (GApplication            *application,
    }
 
 #ifdef SYSCONFDIR
+   /*
+    * If we have a sysconfdir configured, try to load the postald.conf
+    * configuration file unless --config was provided.
+    */
    if (!config) {
       if (g_file_test(SYSCONFDIR"/postald.conf", G_FILE_TEST_EXISTS)) {
          config = g_strdup(SYSCONFDIR"/postald.conf");
@@ -89,7 +93,10 @@ postal_application_command_line (GApplication            *application,
    }
 #endif
 
-
+   /*
+    * Load the configuration file into a GKeyFile for services to use
+    * when starting.
+    */
    if (config) {
       key_file = g_key_file_new();
       if (!g_key_file_load_from_file(key_file, config, 0, &error)) {
@@ -102,6 +109,9 @@ postal_application_command_line (GApplication            *application,
       neo_application_set_config(NEO_APPLICATION(application), key_file);
    }
 
+   /*
+    * Start the application.
+    */
    neo_service_start(NEO_SERVICE(application), NULL);
 
 cleanup:
@@ -131,19 +141,31 @@ postal_application_init (PostalApplication *application)
    NeoService *service;
    NeoLogger *logger;
 
+   /*
+    * Add default logger for STDOUT.
+    */
    logger = neo_logger_unix_new(STDOUT_FILENO, FALSE);
    neo_application_add_logger(NEO_APPLICATION(application), logger);
    g_object_unref(logger);
 
+   /*
+    * Add primary service that manages devices.
+    */
    service = NEO_SERVICE(postal_service_new());
    neo_service_add_child(NEO_SERVICE(application), service);
    g_object_unref(service);
 
+   /*
+    * Add HTTP service hosting the API gateway.
+    */
    service = NEO_SERVICE(postal_http_new());
    neo_service_add_child(NEO_SERVICE(application), service);
    g_object_unref(service);
 
 #ifdef ENABLE_REDIS
+   /*
+    * Add Redis service for publishing metrics to external system.
+    */
    service = NEO_SERVICE(postal_redis_new());
    neo_service_add_child(NEO_SERVICE(application), service);
    g_object_unref(service);
