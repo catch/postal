@@ -60,6 +60,14 @@ G_DEFINE_TYPE_EXTENDED(NeoApplication,
 
 static GParamSpec *gParamSpecs[LAST_PROP];
 
+/**
+ * neo_application_set_config:
+ * @application: A #NeoApplication.
+ * @config: A #GKeyFile.
+ *
+ * Sets the configuration to use for the application. This should be set
+ * before calling neo_application_start().
+ */
 void
 neo_application_set_config (NeoApplication *application,
                             GKeyFile       *config)
@@ -165,6 +173,14 @@ neo_application_log_handler (const gchar    *log_domain,
    g_free(formatted);
 }
 
+/**
+ * neo_application_get_logging_enabled:
+ * @application: A #NeoApplication.
+ *
+ * Gets if @application should manage logging for the process.
+ *
+ * Returns: %TRUE if #NeoApplication is managing process logging.
+ */
 gboolean
 neo_application_get_logging_enabled (NeoApplication *application)
 {
@@ -172,6 +188,17 @@ neo_application_get_logging_enabled (NeoApplication *application)
    return application->priv->logging_enabled;
 }
 
+/**
+ * neo_application_set_logging_enabled:
+ * @application: A #NeoApplication.
+ * @logging_enabled: A #gboolean.
+ *
+ * Sets if @application should manage logging for the process. If
+ * @logging_enabled is %FALSE, then the default logger will be enabled.
+ * Otherwise, the @application instance will configure it's own logger
+ * and loggers added with neo_application_add_logger() will be notified
+ * on new log messages.
+ */
 void
 neo_application_set_logging_enabled (NeoApplication *application,
                                      gboolean        logging_enabled)
@@ -188,6 +215,14 @@ neo_application_set_logging_enabled (NeoApplication *application,
                             gParamSpecs[PROP_LOGGING_ENABLED]);
 }
 
+/**
+ * neo_application_add_logger:
+ * @application: A #NeoApplication.
+ * @logger: A #NeoLogger.
+ *
+ * Adds @logger to the list of loggers notified on incoming log messages.
+ * :logging-enabled must be %TRUE for @logger to be notified.
+ */
 void
 neo_application_add_logger (NeoApplication *application,
                             NeoLogger      *logger)
