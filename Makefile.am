@@ -1,6 +1,7 @@
 noinst_LTLIBRARIES =
 
 include Makefile.tests
+include init/Makefile.include
 include mongo-glib/Makefile.include
 include neo/Makefile.include
 include postal/Makefile.include

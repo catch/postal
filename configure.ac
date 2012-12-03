@@ -72,6 +72,21 @@ AM_CONDITIONAL([ENABLE_UNISTRING], [test "x$enable_unistring" = xyes])
 
 
 dnl **************************************************************************
+dnl SystemD init support
+dnl **************************************************************************
+AC_ARG_WITH([systemdsystemunitdir],
+	    AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
+	                   [Directory for systemd service files]))
+AS_IF([test -z "$with_systemdsystemunitdir" && $PKG_CONFIG systemd],
+       with_systemdsystemunitdir="\$(prefix)/lib/systemd/system")
+AS_IF([test -z "$with_systemdsystemunitdir"], with_systemdsystemunitdir=no)
+AM_CONDITIONAL(HAVE_SYSTEMD, [test "$with_systemdsystemunitdir" != no])
+if test "$with_systemdsystemunitdir" != no; then
+	AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+fi
+
+
+dnl **************************************************************************
 dnl Enable extra debugging options
 dnl **************************************************************************
 AC_ARG_ENABLE([debug],
@@ -146,6 +161,7 @@ AC_CONFIG_FILES([
 	Makefile
 	init/postald.conf
 	init/postald.service
+	init/sysconfig/postald
 ])
 AC_OUTPUT
 
@@ -165,3 +181,9 @@ echo "  GIO ....................: $(pkg-config --modversion gio-2.0)"
 echo "  JSON ...................: $(pkg-config --modversion json-glib-1.0)"
 echo "  SOUP ...................: $(pkg-config --modversion libsoup-2.4)"
 echo ""
+
+if test "x$with_systemdsystemunitdir" != "xno"; then
+	echo "SystemD"
+	echo "  Service Directory ......: ${with_systemdsystemunitdir}"
+	echo ""
+fi
