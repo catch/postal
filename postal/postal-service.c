@@ -930,11 +930,12 @@ postal_service_notify_cb (GObject      *object,
    MongoMessageReply *reply;
    PushC2dmIdentity *c2dm;
    PushC2dmMessage *c2dm_message;
+   PushGcmIdentity *gcm;
    PushGcmMessage *gcm_message;
    MongoConnection *connection = (MongoConnection *)object;
    PushApsIdentity *aps;
    PushApsMessage *aps_message;
-   MongoBsonIter iter;
+   PostalDevice *device;
    const gchar *device_type;
    const gchar *device_token;
    GObject *source;
@@ -977,46 +978,58 @@ postal_service_notify_cb (GObject      *object,
 
    list = mongo_message_reply_get_documents(reply);
    for (; list; list = list->next) {
-      if (mongo_bson_iter_init_find(&iter, list->data, "device_type")) {
-         device_type = mongo_bson_iter_get_value_string(&iter, NULL);
-         if (!g_strcmp0(device_type, "gcm")) {
-            if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-               gcm_devices = g_list_append(gcm_devices,
-                                           push_gcm_identity_new(device_token));
-            }
-         } else if (!g_strcmp0(device_type, "c2dm")) {
-            if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-               c2dm = g_object_new(PUSH_TYPE_C2DM_IDENTITY,
-                                   "registration-id", device_token,
-                                   NULL);
-               push_c2dm_client_deliver_async(priv->c2dm,
-                                              c2dm,
-                                              c2dm_message,
-                                              NULL, /* TODO: */
-                                              postal_service_notify_c2dm_cb,
-                                              NULL);
-               g_object_unref(c2dm);
-            }
-         } else if (!g_strcmp0(device_type, "aps")) {
-            if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-               device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-               aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
-                                  "device-token", device_token,
-                                  NULL);
-               push_aps_client_deliver_async(priv->aps,
-                                             aps,
-                                             aps_message,
-                                             NULL, /* TODO: */
-                                             postal_service_notify_aps_cb,
-                                             NULL);
-               g_object_unref(aps);
-            }
-         } else {
-            g_warning("Unknown device_type %s", device_type);
-         }
+      /*
+       * Inflate a PostalDevice for this MongoBson.
+       */
+      device = postal_device_new();
+      if (!postal_device_load_from_bson(device, list->data, NULL)) {
+         g_object_unref(device);
+         continue;
       }
+
+      /*
+       * Fetch the device type and device token.
+       */
+      device_type = postal_device_get_device_type(device);
+      device_token = postal_device_get_device_token(device);
+      if (!device_type || !device_token) {
+         g_object_unref(device);
+         continue;
+      }
+
+      if (!g_strcmp0(device_type, "gcm")) {
+         gcm = push_gcm_identity_new(device_token);
+         gcm_devices = g_list_append(gcm_devices, gcm);
+         postal_metrics_device_notified(priv->metrics, device);
+      } else if (!g_strcmp0(device_type, "c2dm")) {
+         c2dm = g_object_new(PUSH_TYPE_C2DM_IDENTITY,
+                             "registration-id", device_token,
+                             NULL);
+         push_c2dm_client_deliver_async(priv->c2dm,
+                                        c2dm,
+                                        c2dm_message,
+                                        NULL, /* TODO: */
+                                        postal_service_notify_c2dm_cb,
+                                        NULL);
+         postal_metrics_device_notified(priv->metrics, device);
+         g_object_unref(c2dm);
+      } else if (!g_strcmp0(device_type, "aps")) {
+         aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
+                            "device-token", device_token,
+                            NULL);
+         push_aps_client_deliver_async(priv->aps,
+                                       aps,
+                                       aps_message,
+                                       NULL, /* TODO: */
+                                       postal_service_notify_aps_cb,
+                                       NULL);
+         postal_metrics_device_notified(priv->metrics, device);
+         g_object_unref(aps);
+      } else {
+         g_assert_not_reached();
+      }
+
+      g_object_unref(device);
    }
 
    if (gcm_devices) {
