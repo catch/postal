@@ -73,6 +73,10 @@ postal_device_get_removed_at (PostalDevice *device)
 
    priv = device->priv;
 
+   /*
+    * If removed_at is { 0, 0 }, then we just return NULL so the caller
+    * doesn't also have to check for an unset value.
+    */
    if (!priv->removed_at.tv_sec && !priv->removed_at.tv_usec) {
       return NULL;
    }
@@ -85,7 +89,8 @@ postal_device_get_removed_at (PostalDevice *device)
  * @device: (in): A #PostalDevice.
  * @removed_at: (in) (allow-none): A #GTimeVal.
  *
- * Sets the :removed-at property.
+ * Sets the :removed-at property. If @removed_at is %NULL, then the :removed-at
+ * property is unset.
  */
 void
 postal_device_set_removed_at (PostalDevice *device,
@@ -204,6 +209,16 @@ postal_device_set_device_type (PostalDevice *device,
    g_object_notify_by_pspec(G_OBJECT(device), gParamSpecs[PROP_DEVICE_TYPE]);
 }
 
+/**
+ * postal_device_load_from_bson:
+ * @device: (in): A #PostalDevice.
+ * @bson: (in): A #MongoBson.
+ * @error: (out): A location for a #GError, or %NULL.
+ *
+ * Inflates a #PostalDevice from the contents of a #MongoBson.
+ *
+ * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
+ */
 gboolean
 postal_device_load_from_bson (PostalDevice  *device,
                               MongoBson     *bson,
@@ -315,6 +330,17 @@ postal_device_save_to_bson (PostalDevice  *device,
    RETURN(ret);
 }
 
+/**
+ * postal_device_save_to_json:
+ * @device: (in): A #PostalDevice.
+ * @error: (out): A location for a #GError, or %NULL.
+ *
+ * Serializes a #PostalDevice into a #JsonNode. This allows the caller to
+ * serialize the #JsonNode into a JSON string using #JsonGenerator.
+ *
+ * Returns: (transfer full): A #JsonNode if successful; otherwise %NULL
+ *    and @error is set.
+ */
 JsonNode *
 postal_device_save_to_json (PostalDevice  *device,
                             GError       **error)
@@ -367,6 +393,18 @@ postal_device_save_to_json (PostalDevice  *device,
    return node;
 }
 
+/**
+ * postal_device_load_from_json:
+ * @device: (in): A #PostalDevice.
+ * @node: (in): A #JsonNode.
+ * @error: (out): A location for a #GError, or %NULL.
+ *
+ * Loads a #PostalDevice from the contents of a #JsonNode. This is primarily
+ * useful to create a device that should be saved from a system containing
+ * a JSON string describing the device; such as a HTTP gateway.
+ *
+ * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
+ */
 gboolean
 postal_device_load_from_json (PostalDevice  *device,
                               JsonNode      *node,
