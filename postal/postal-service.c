@@ -24,9 +24,7 @@
 #include <push-glib/push-glib.h>
 
 #include "postal-debug.h"
-#ifdef ENABLE_REDIS
-#include "postal-redis.h"
-#endif
+#include "postal-metrics.h"
 #include "postal-service.h"
 
 G_DEFINE_TYPE(PostalService, postal_service, NEO_TYPE_SERVICE_BASE)
@@ -39,10 +37,8 @@ struct _PostalServicePrivate
    gchar           *db_and_collection;
    gchar           *db;
    gchar           *collection;
+   PostalMetrics   *metrics;
    MongoConnection *mongo;
-#ifdef ENABLE_REDIS
-   PostalRedis     *redis;
-#endif
 };
 
 PostalService *
@@ -75,16 +71,20 @@ postal_service_add_device_cb (GObject      *object,
                                               &updated_existing,
                                               &error))) {
       g_simple_async_result_take_error(simple, error);
-#ifdef ENABLE_REDIS
    } else {
       PostalService *service;
       PostalDevice *device;
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
       service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
-      postal_redis_device_added(service->priv->redis, device);
+      if (service->priv->metrics) {
+         if (updated_existing) {
+            postal_metrics_device_added(service->priv->metrics, device);
+         } else {
+            postal_metrics_device_updated(service->priv->metrics, device);
+         }
+      }
       g_object_unref(service);
-#endif
    }
 
    g_object_set_data(G_OBJECT(simple),
@@ -263,16 +263,16 @@ postal_service_remove_device_cb (GObject      *object,
                                               &updated_existing,
                                               &error))) {
       g_simple_async_result_take_error(simple, error);
-#ifdef ENABLE_REDIS
    } else {
       PostalService *service;
       PostalDevice *device;
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
       service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
-      postal_redis_device_removed(service->priv->redis, device);
+      if (service->priv->metrics) {
+         postal_metrics_device_removed(service->priv->metrics, device);
+      }
       g_object_unref(service);
-#endif
    }
 
    g_simple_async_result_set_op_res_gboolean(simple, ret);
@@ -1399,6 +1399,7 @@ postal_service_start (NeoServiceBase *base,
    PostalServicePrivate *priv;
    PushApsClientMode aps_mode;
    PostalService *service = (PostalService *)base;
+   NeoService *peer;
    gchar *c2dm_auth_token = NULL;
    gchar *gcm_auth_token = NULL;
    gchar *ssl_cert_file = NULL;
@@ -1464,9 +1465,9 @@ postal_service_start (NeoServiceBase *base,
                             NULL);
    priv->mongo = mongo_connection_new_from_uri(uri);
 
-#ifdef ENABLE_REDIS
-   priv->redis = POSTAL_REDIS(neo_service_get_peer(NEO_SERVICE(service), "redis"));
-#endif
+   if ((peer = neo_service_get_peer(NEO_SERVICE(base), "metrics"))) {
+      priv->metrics = g_object_ref(peer);
+   }
 
    g_signal_connect_swapped(priv->aps,
                             "identity-removed",
@@ -1504,6 +1505,7 @@ postal_service_finalize (GObject *object)
    g_clear_object(&priv->aps);
    g_clear_object(&priv->c2dm);
    g_clear_object(&priv->mongo);
+   g_clear_object(&priv->metrics);
 
    G_OBJECT_CLASS(postal_service_parent_class)->finalize(object);
 

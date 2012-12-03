@@ -28,6 +28,7 @@
 #include "postal-application.h"
 #include "postal-debug.h"
 #include "postal-http.h"
+#include "postal-metrics.h"
 #ifdef ENABLE_REDIS
 #include "postal-redis.h"
 #endif
@@ -159,6 +160,13 @@ postal_application_init (PostalApplication *application)
     * Add HTTP service hosting the API gateway.
     */
    service = NEO_SERVICE(postal_http_new());
+   neo_service_add_child(NEO_SERVICE(application), service);
+   g_object_unref(service);
+
+   /*
+    * Add metrics service used for counters.
+    */
+   service = NEO_SERVICE(postal_metrics_new());
    neo_service_add_child(NEO_SERVICE(application), service);
    g_object_unref(service);
 
