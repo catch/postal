@@ -1020,14 +1020,14 @@ postal_service_notify_cb (GObject      *object,
    }
 
    if (gcm_devices) {
-         push_gcm_client_deliver_async(priv->gcm,
-                                       gcm_devices,
-                                       gcm_message,
-                                       NULL, /* TODO: */
-                                       postal_service_notify_gcm_cb,
-                                       NULL);
-         g_list_foreach(gcm_devices, (GFunc)g_object_unref, NULL);
-         g_list_free(gcm_devices);
+      push_gcm_client_deliver_async(priv->gcm,
+                                    gcm_devices,
+                                    gcm_message,
+                                    NULL, /* TODO: */
+                                    postal_service_notify_gcm_cb,
+                                    NULL);
+      g_list_foreach(gcm_devices, (GFunc)g_object_unref, NULL);
+      g_list_free(gcm_devices);
    }
 
    g_object_unref(aps_message);
