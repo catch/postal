@@ -83,8 +83,8 @@ postal_application_command_line (GApplication            *application,
 
 #ifdef SYSCONFDIR
    if (!config) {
-      if (g_file_test(SYSCONFDIR"/postal.conf", G_FILE_TEST_EXISTS)) {
-         config = g_strdup(SYSCONFDIR"/postal.conf");
+      if (g_file_test(SYSCONFDIR"/postald.conf", G_FILE_TEST_EXISTS)) {
+         config = g_strdup(SYSCONFDIR"/postald.conf");
       }
    }
 #endif
