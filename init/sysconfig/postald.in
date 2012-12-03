@@ -1,1 +1,1 @@
-OPTIONS="-c @sysconfdir@/postal.conf"
+OPTIONS="-c @sysconfdir@/postald.conf"

@@ -21,7 +21,7 @@ postaldoc_DATA += README
 postaldoc_DATA += README.md
 
 sysconf_DATA =
-sysconf_DATA += conf/postal.conf
+sysconf_DATA += conf/postald.conf
 
 EXTRA_DIST += $(postaldoc_DATA)
 EXTRA_DIST += $(sysconf_DATA)
