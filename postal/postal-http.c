@@ -22,9 +22,11 @@
 
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
+#include <string.h>
 
 #include "postal-debug.h"
 #include "postal-http.h"
+#include "postal-metrics.h"
 #include "postal-service.h"
 
 #include "neo-logger.h"
@@ -41,6 +43,7 @@ struct _PostalHttpPrivate
 {
    gboolean       started;
    NeoLogger     *logger;
+   PostalMetrics *metrics;
    UrlRouter     *router;
    SoupServer    *server;
    PostalService *service;
@@ -792,6 +795,49 @@ postal_http_log_message (PostalHttp        *http,
 }
 
 static void
+postal_http_handle_status (UrlRouter         *router,
+                           SoupServer        *server,
+                           SoupMessage       *message,
+                           const gchar       *path,
+                           GHashTable        *params,
+                           GHashTable        *query,
+                           SoupClientContext *client,
+                           gpointer           user_data)
+{
+   PostalHttp *http = user_data;
+   guint64 devices_added;
+   guint64 devices_removed;
+   guint64 devices_updated;
+   gchar *str;
+
+   g_assert(POSTAL_IS_HTTP(http));
+
+   g_object_get(http->priv->metrics,
+                "devices-added", &devices_added,
+                "devices-removed", &devices_removed,
+                "devices-updated", &devices_updated,
+                NULL);
+   /*
+    * XXX: This technically isn't valid JSON since it is limited to
+    *      56-bit integers. But that's okay, I'm not terribly worried.
+    */
+   str = g_strdup_printf("{\n"
+                         "  \"devices_added\": %"G_GUINT64_FORMAT",\n"
+                         "  \"devices_removed\": %"G_GUINT64_FORMAT",\n"
+                         "  \"devices_updated\": %"G_GUINT64_FORMAT"\n"
+                         "}\n",
+                         devices_added,
+                         devices_removed,
+                         devices_updated);
+   soup_message_set_status(message, SOUP_STATUS_OK);
+   soup_message_set_response(message,
+                             "application/json",
+                             SOUP_MEMORY_TAKE,
+                             str,
+                             strlen(str));
+}
+
+static void
 postal_http_router (SoupServer        *server,
                     SoupMessage       *message,
                     const gchar       *path,
@@ -847,6 +893,7 @@ postal_http_start (NeoServiceBase *base,
                    GKeyFile       *config)
 {
    PostalHttpPrivate *priv;
+   NeoService *peer;
    gboolean nologging = FALSE;
    gchar *logfile = NULL;
    guint port = 0;
@@ -863,8 +910,19 @@ postal_http_start (NeoServiceBase *base,
       nologging = g_key_file_get_boolean(config, "http", "nologging", NULL);
    }
 
-   priv->service = POSTAL_SERVICE(neo_service_get_peer(NEO_SERVICE(base),
-                                                       "service"));
+   if (!(peer = neo_service_get_peer(NEO_SERVICE(base), "metrics"))) {
+      g_error("Failed to discover PostalMetrics!");
+   }
+
+   g_assert(POSTAL_IS_METRICS(peer));
+   priv->metrics = g_object_ref(peer);
+
+   if (!(peer = neo_service_get_peer(NEO_SERVICE(base), "service"))) {
+      g_error("Failed to discover PostalService!");
+   }
+
+   g_assert(POSTAL_IS_SERVICE(peer));
+   priv->service = g_object_ref(peer);
 
    priv->server = soup_server_new(SOUP_SERVER_PORT, port ?: 5300,
                                   SOUP_SERVER_SERVER_HEADER, "Postal/"VERSION,
@@ -952,6 +1010,10 @@ postal_http_init (PostalHttp *http)
                                   PostalHttpPrivate);
 
    http->priv->router = url_router_new();
+   url_router_add_handler(http->priv->router,
+                          "/status",
+                          postal_http_handle_status,
+                          http);
    url_router_add_handler(http->priv->router,
                           "/v1/users/:user/devices",
                           postal_http_handle_v1_users_user_devices,
