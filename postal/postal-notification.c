@@ -44,6 +44,14 @@ enum
 
 static GParamSpec *gParamSpecs[LAST_PROP];
 
+/**
+ * postal_notification_get_aps:
+ * @notification: (in): A #PostalNotification.
+ *
+ * Fetches the :aps property.
+ *
+ * Returns: (transfer none): A #JsonObject.
+ */
 JsonObject *
 postal_notification_get_aps (PostalNotification *notification)
 {
@@ -73,6 +81,14 @@ postal_notification_set_aps (PostalNotification *notification,
    g_object_notify_by_pspec(G_OBJECT(notification), gParamSpecs[PROP_APS]);
 }
 
+/**
+ * postal_notification_get_c2dm:
+ * @notification: (in): A #PostalNotification.
+ *
+ * Fetches the :c2dm property.
+ *
+ * Returns: (transfer none: A #JsonObject or %NULL.
+ */
 JsonObject *
 postal_notification_get_c2dm (PostalNotification *notification)
 {
@@ -102,6 +118,14 @@ postal_notification_set_c2dm (PostalNotification *notification,
    g_object_notify_by_pspec(G_OBJECT(notification), gParamSpecs[PROP_C2DM]);
 }
 
+/**
+ * postal_notification_get_collapse_key:
+ * @notification: (in): A #PostalNotification.
+ *
+ * Fetches the :collapse-key property.
+ *
+ * Returns: A string containing :collapse-key or %NULL.
+ */
 const gchar *
 postal_notification_get_collapse_key (PostalNotification *notification)
 {
@@ -120,6 +144,14 @@ postal_notification_set_collapse_key (PostalNotification *notification,
                             gParamSpecs[PROP_COLLAPSE_KEY]);
 }
 
+/**
+ * postal_notification_get_gcm:
+ * @notification: (in): A #PostalNotification.
+ *
+ * Fetches the :gcm property.
+ *
+ * Returns: A #JsonObject or %NULL.
+ */
 JsonObject *
 postal_notification_get_gcm (PostalNotification *notification)
 {
@@ -278,10 +310,8 @@ static void
 postal_notification_init (PostalNotification *notification)
 {
    ENTRY;
-
    notification->priv = G_TYPE_INSTANCE_GET_PRIVATE(notification,
                                                     POSTAL_TYPE_NOTIFICATION,
                                                     PostalNotificationPrivate);
-
    EXIT;
 }
