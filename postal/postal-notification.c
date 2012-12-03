@@ -183,6 +183,10 @@ postal_notification_get_property (GObject    *object,
    case PROP_C2DM:
       g_value_set_boxed(value, postal_notification_get_c2dm(notification));
       break;
+   case PROP_COLLAPSE_KEY:
+      g_value_set_string(value,
+                         postal_notification_get_collapse_key(notification));
+      break;
    case PROP_GCM:
       g_value_set_boxed(value, postal_notification_get_gcm(notification));
       break;
@@ -205,6 +209,10 @@ postal_notification_set_property (GObject      *object,
       break;
    case PROP_C2DM:
       postal_notification_set_c2dm(notification, g_value_get_boxed(value));
+      break;
+   case PROP_COLLAPSE_KEY:
+      postal_notification_set_collapse_key(notification,
+                                           g_value_get_string(value));
       break;
    case PROP_GCM:
       postal_notification_set_gcm(notification, g_value_get_boxed(value));
@@ -244,6 +252,15 @@ postal_notification_class_init (PostalNotificationClass *klass)
                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
    g_object_class_install_property(object_class, PROP_C2DM,
                                    gParamSpecs[PROP_C2DM]);
+
+   gParamSpecs[PROP_COLLAPSE_KEY] =
+      g_param_spec_string("collapse-key",
+                          _("Collapse Key"),
+                          _("The collapse key for reducing notifications per device."),
+                          NULL,
+                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+   g_object_class_install_property(object_class, PROP_COLLAPSE_KEY,
+                                   gParamSpecs[PROP_COLLAPSE_KEY]);
 
    gParamSpecs[PROP_GCM] =
       g_param_spec_boxed("gcm",
