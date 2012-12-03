@@ -161,6 +161,7 @@ postal_notification_finalize (GObject *object)
    json_object_unref(priv->aps);
    json_object_unref(priv->c2dm);
    json_object_unref(priv->gcm);
+   g_free(priv->collapse_key);
 
    G_OBJECT_CLASS(postal_notification_parent_class)->finalize(object);
 
