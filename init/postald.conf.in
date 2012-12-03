@@ -13,7 +13,7 @@ end script
 # Give up if respawn occurs 10 times in 30 seconds.
 respawn limit 10 30
 
-exec @prefix@/bin/postald -c @sysconfdir@/postal.conf
+exec @prefix@/bin/postald -c @sysconfdir@/postald.conf
 
 respawn
 
