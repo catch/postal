@@ -25,10 +25,10 @@ G_DEFINE_TYPE(PostalDevice, postal_device, G_TYPE_OBJECT)
 
 struct _PostalDevicePrivate
 {
-   gchar    *device_token;
-   gchar    *device_type;
-   GTimeVal  removed_at;
-   gchar    *user;
+   gchar            *device_token;
+   PostalDeviceType  device_type;
+   GTimeVal          removed_at;
+   gchar            *user;
 };
 
 enum
@@ -41,6 +41,29 @@ enum
 };
 
 static GParamSpec *gParamSpecs[LAST_PROP];
+
+static const gchar *
+postal_device_type_to_string (PostalDeviceType device_type)
+{
+   const gchar *str;
+
+   switch (device_type) {
+   case POSTAL_DEVICE_APS:
+      str = "aps";
+      break;
+   case POSTAL_DEVICE_C2DM:
+      str = "c2dm";
+      break;
+   case POSTAL_DEVICE_GCM:
+      str = "gcm";
+      break;
+   default:
+      str = NULL;
+      break;
+   }
+
+   return str;
+}
 
 /**
  * postal_device_new:
@@ -183,30 +206,50 @@ postal_device_set_device_token (PostalDevice *device,
  * Fetches the :device-type property of the #PostalDevice. This is the backend
  * that should be used to communicate with the device.
  *
- * Returns: (transfer none): A string.
+ * Returns: A #PostalDeviceType.
  */
-const gchar *
+PostalDeviceType
 postal_device_get_device_type (PostalDevice *device)
 {
-   g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), 0);
    return device->priv->device_type;
 }
 
 /**
  * postal_device_set_device_type:
  * @device: (in): A #PostalDevice.
+ * @device_type: (in): A #PostalDeviceType.
  *
  * Sets the :device-type property of the #PostalDevice.
  * See postal_device_get_device_type().
  */
 void
-postal_device_set_device_type (PostalDevice *device,
-                               const gchar  *device_type)
+postal_device_set_device_type (PostalDevice     *device,
+                               PostalDeviceType  device_type)
 {
    g_return_if_fail(POSTAL_IS_DEVICE(device));
-   g_free(device->priv->device_type);
-   device->priv->device_type = g_strdup(device_type);
+   device->priv->device_type = device_type;
    g_object_notify_by_pspec(G_OBJECT(device), gParamSpecs[PROP_DEVICE_TYPE]);
+}
+
+static void
+postal_device_set_device_type_string (PostalDevice *device,
+                                      const gchar  *device_type)
+{
+   PostalDeviceType t = 0;
+
+   g_return_if_fail(POSTAL_IS_DEVICE(device));
+   g_return_if_fail(device_type);
+
+   if (!g_strcmp0(device_type, "aps")) {
+      t = POSTAL_DEVICE_APS;
+   } else if (!g_strcmp0(device_type, "c2dm")) {
+      t = POSTAL_DEVICE_C2DM;
+   } else if (!g_strcmp0(device_type, "gcm")) {
+      t = POSTAL_DEVICE_GCM;
+   }
+
+   postal_device_set_device_type(device, t);
 }
 
 /**
@@ -242,7 +285,7 @@ postal_device_load_from_bson (PostalDevice  *device,
    while (mongo_bson_iter_next(&iter)) {
       if (mongo_bson_iter_is_key(&iter, "device_type")) {
          str = mongo_bson_iter_get_value_string(&iter, NULL);
-         postal_device_set_device_type(device, str);
+         postal_device_set_device_type_string(device, str);
       } else if (mongo_bson_iter_is_key(&iter, "device_token")) {
          str = mongo_bson_iter_get_value_string(&iter, NULL);
          postal_device_set_device_token(device, str);
@@ -288,6 +331,7 @@ postal_device_save_to_bson (PostalDevice  *device,
 {
    PostalDevicePrivate *priv;
    MongoObjectId *id;
+   const gchar *str;
    MongoBson *ret;
 
    ENTRY;
@@ -308,7 +352,8 @@ postal_device_save_to_bson (PostalDevice  *device,
 
    ret = mongo_bson_new_empty();
    mongo_bson_append_string(ret, "device_token", priv->device_token);
-   mongo_bson_append_string(ret, "device_type", priv->device_type);
+   str = postal_device_type_to_string(priv->device_type);
+   mongo_bson_append_string(ret, "device_type", str);
 
    /*
     * Special case user to opportunistically use ObjectId.
@@ -346,6 +391,7 @@ postal_device_save_to_json (PostalDevice  *device,
                             GError       **error)
 {
    PostalDevicePrivate *priv;
+   const gchar *cstr;
    JsonObject *obj;
    JsonNode *node;
    gchar *str;
@@ -362,8 +408,9 @@ postal_device_save_to_json (PostalDevice  *device,
       json_object_set_null_member(obj, "device_token");
    }
 
-   if (priv->device_type) {
-      json_object_set_string_member(obj, "device_type", priv->device_type);
+   cstr = postal_device_type_to_string(priv->device_type);
+   if (cstr) {
+      json_object_set_string_member(obj, "device_type", cstr);
    } else {
       json_object_set_null_member(obj, "device_type");
    }
@@ -450,7 +497,7 @@ postal_device_load_from_json (PostalDevice  *device,
                   str);
       RETURN(FALSE);
    }
-   postal_device_set_device_type(device, str);
+   postal_device_set_device_type_string(device, str);
 
    str = json_object_get_string_member(obj, "device_token");
    postal_device_set_device_token(device, str);
@@ -468,7 +515,6 @@ postal_device_finalize (GObject *object)
    priv = POSTAL_DEVICE(object)->priv;
 
    g_free(priv->device_token);
-   g_free(priv->device_type);
    g_free(priv->user);
 
    G_OBJECT_CLASS(postal_device_parent_class)->finalize(object);
@@ -489,7 +535,7 @@ postal_device_get_property (GObject    *object,
       g_value_set_string(value, postal_device_get_device_token(device));
       break;
    case PROP_DEVICE_TYPE:
-      g_value_set_string(value, postal_device_get_device_type(device));
+      g_value_set_enum(value, postal_device_get_device_type(device));
       break;
    case PROP_USER:
       g_value_set_string(value, postal_device_get_user(device));
@@ -512,7 +558,7 @@ postal_device_set_property (GObject      *object,
       postal_device_set_device_token(device, g_value_get_string(value));
       break;
    case PROP_DEVICE_TYPE:
-      postal_device_set_device_type(device, g_value_get_string(value));
+      postal_device_set_device_type(device, g_value_get_enum(value));
       break;
    case PROP_USER:
       postal_device_set_user(device, g_value_get_string(value));
@@ -545,11 +591,12 @@ postal_device_class_init (PostalDeviceClass *klass)
                                    gParamSpecs[PROP_DEVICE_TOKEN]);
 
    gParamSpecs[PROP_DEVICE_TYPE] =
-      g_param_spec_string("device-type",
-                          _("Device Type"),
-                          _("The backend for communicating with this device."),
-                          NULL,
-                          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
+      g_param_spec_enum("device-type",
+                        _("Device Type"),
+                        _("The backend for communicating with this device."),
+                        POSTAL_TYPE_DEVICE_TYPE,
+                        POSTAL_DEVICE_APS,
+                        G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
    g_object_class_install_property(object_class, PROP_DEVICE_TYPE,
                                    gParamSpecs[PROP_DEVICE_TYPE]);
 
@@ -573,6 +620,7 @@ postal_device_init (PostalDevice *device)
    device->priv = G_TYPE_INSTANCE_GET_PRIVATE(device,
                                               POSTAL_TYPE_DEVICE,
                                               PostalDevicePrivate);
+   device->priv->device_type = POSTAL_DEVICE_APS;
 
    EXIT;
 }
@@ -581,4 +629,24 @@ GQuark
 postal_device_error_quark (void)
 {
    return g_quark_from_static_string("PostalDeviceError");
+}
+
+GType
+postal_device_type_get_type (void)
+{
+   static volatile gsize g_type_id;
+
+   if (g_once_init_enter(&g_type_id)) {
+      GType type_id;
+      static const GEnumValue values[] = {
+         { POSTAL_DEVICE_APS, "POSTAL_DEVICE_APS", "APS" },
+         { POSTAL_DEVICE_C2DM, "POSTAL_DEVICE_C2DM", "C2DM" },
+         { POSTAL_DEVICE_GCM, "POSTAL_DEVICE_GCM", "GCM" },
+         { 0 }
+      };
+      type_id = g_enum_register_static("PostalDeviceType", values);
+      g_once_init_leave(&g_type_id, type_id);
+   }
+
+   return g_type_id;
 }

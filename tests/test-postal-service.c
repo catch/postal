@@ -126,7 +126,7 @@ test1 (void)
    postal_device_set_device_token(device, rand_str);
    g_free(rand_str);
    postal_device_set_user(device, "000011110000111100001111");
-   postal_device_set_device_type(device, "c2dm");
+   postal_device_set_device_type(device, POSTAL_DEVICE_C2DM);
    neo_service_start(NEO_SERVICE(gApp), NULL);
    postal_service_add_device(service, device, NULL, test1_cb, device);
    g_main_loop_run(gMainLoop);

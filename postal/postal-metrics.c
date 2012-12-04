@@ -107,24 +107,26 @@ postal_metrics_device_notified (PostalMetrics *metrics,
                                 PostalDevice  *device)
 {
    PostalMetricsPrivate *priv;
-   const gchar *device_type;
+   PostalDeviceType device_type;
 
    g_return_if_fail(POSTAL_IS_METRICS(metrics));
 
    priv = metrics->priv;
 
-   /*
-    * XXX: Make device-type an enum for jumptables.
-    */
-
    device_type = postal_device_get_device_type(device);
 
-   if (!g_strcmp0(device_type, "aps")) {
+   switch (device_type) {
+   case POSTAL_DEVICE_APS:
       __sync_fetch_and_add(&priv->aps_notified, 1);
-   } else if (!g_strcmp0(device_type, "c2dm")) {
+      break;
+   case POSTAL_DEVICE_C2DM:
       __sync_fetch_and_add(&priv->c2dm_notified, 1);
-   } else if (!g_strcmp0(device_type, "gcm")) {
+      break;
+   case POSTAL_DEVICE_GCM:
       __sync_fetch_and_add(&priv->gcm_notified, 1);
+      break;
+   default:
+      break;
    }
 
 #ifdef ENABLE_REDIS

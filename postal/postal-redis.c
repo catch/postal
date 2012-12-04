@@ -151,7 +151,8 @@ static gchar *
 postal_redis_build_message (PostalDevice *device,
                             const gchar  *action)
 {
-   const gchar *device_type;
+   PostalDeviceType device_type;
+   const gchar *device_type_str;
    const gchar *device_token;
    const gchar *user;
    gchar *ret;
@@ -163,6 +164,21 @@ postal_redis_build_message (PostalDevice *device,
    device_token = postal_device_get_device_token(device);
    user = postal_device_get_user(device);
 
+   switch (device_type) {
+   case POSTAL_DEVICE_APS:
+      device_type_str = "aps";
+      break;
+   case POSTAL_DEVICE_C2DM:
+      device_type_str = "c2dm";
+      break;
+   case POSTAL_DEVICE_GCM:
+      device_type_str = "gcm";
+      break;
+   default:
+      device_type_str = NULL;
+      break;
+   }
+
    ret = g_strdup_printf("{\n"
                          "  \"Action\": \"%s\",\n"
                          "  \"DeviceType\": \"%s\",\n"
@@ -170,7 +186,7 @@ postal_redis_build_message (PostalDevice *device,
                          "  \"User\": \"%s\"\n"
                          "}",
                          action,
-                         device_type,
+                         device_type_str,
                          device_token,
                          user);
 
