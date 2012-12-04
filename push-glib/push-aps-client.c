@@ -38,6 +38,10 @@
 
 #define PUSH_APS_CLIENT_TIMEOUT_SECONDS 2
 
+#ifndef g_str_empty0
+#define g_str_empty0(s) (!(s) || !(s)[0])
+#endif
+
 G_DEFINE_TYPE(PushApsClient, push_aps_client, G_TYPE_OBJECT)
 
 #pragma pack(1)
@@ -1075,11 +1079,14 @@ push_aps_client_try_load_tls (PushApsClient *client)
    GTlsCertificate *tls;
    GError *error = NULL;
 
+   ENTRY;
+
    g_return_if_fail(PUSH_IS_APS_CLIENT(client));
 
    priv = client->priv;
 
-   if (priv->ssl_cert_file && priv->ssl_key_file) {
+   if (!g_str_empty0(priv->ssl_cert_file) &&
+       !g_str_empty0(priv->ssl_key_file)) {
       if (!(tls = g_tls_certificate_new_from_files(priv->ssl_cert_file,
                                                    priv->ssl_key_file,
                                                    &error))) {
@@ -1091,6 +1098,8 @@ push_aps_client_try_load_tls (PushApsClient *client)
          g_object_unref(tls);
       }
    }
+
+   EXIT;
 }
 
 /**
