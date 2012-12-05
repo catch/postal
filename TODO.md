@@ -1,7 +1,17 @@
 # Things we need immediately.
 
  * Delay of notification delivery.
+   - This involves storing collapse keys temporarily with something like
+     "device_id:collapse_key". It should timeout after 5 minutes or so.
+   - We also might want to delay the sending of the first message by
+     a few milliseconds to help catch spurious deliveries. However, I
+     suspect that the "device_id:collapse_key" will handle this better.
  * Python drivers for twisted and urllib.
+ * Setting "badge" field of device, automatically sends notification
+   if necessary.
+ * Setting of extra fields. There are cases where you might want to
+   tag a device with something like an account_level, or group id.
+   This should allow for delivering to devices matching this key.
 
 # Things that would be nice.
 
