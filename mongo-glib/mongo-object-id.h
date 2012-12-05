@@ -37,6 +37,8 @@ MongoObjectId *mongo_object_id_new_from_string (const gchar          *string);
 MongoObjectId *mongo_object_id_new_from_data   (const guint8         *bytes);
 MongoObjectId *mongo_object_id_copy            (const MongoObjectId  *object_id);
 void           mongo_object_id_free            (MongoObjectId        *object_id);
+void           mongo_object_id_get_timeval     (const MongoObjectId  *object_id,
+                                                GTimeVal             *tv);
 GType          mongo_object_id_get_type        (void) G_GNUC_CONST;
 gchar         *mongo_object_id_to_string       (const MongoObjectId  *object_id);
 void           mongo_object_id_to_string_r     (const MongoObjectId  *object_id,

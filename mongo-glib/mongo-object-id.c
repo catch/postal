@@ -224,7 +224,7 @@ mongo_object_id_new_from_string (const gchar *string)
 }
 
 /**
- * mongo_object_id_to_string_r: (skip):
+ * mongo_object_id_to_string_r: (skip)
  * @object_id: (in): A #MongoObjectId.
  * @string: (out): A location for the resulting string bytes.
  *
@@ -336,8 +336,8 @@ mongo_object_id_compare (const MongoObjectId *object_id,
 
 /**
  * mongo_object_id_equal:
- * @v1: (in): A #MongoObjectId.
- * @v2: (in): A #MongoObjectId.
+ * @v1: (in) (type MongoObjectId*): A #MongoObjectId.
+ * @v2: (in) (type MongoObjectId*): A #MongoObjectId.
  *
  * Checks if @v1 and @v2 contain the same object id.
  *
@@ -352,7 +352,7 @@ mongo_object_id_equal (gconstpointer v1,
 
 /**
  * mongo_object_id_hash:
- * @v: (in): A #MongoObjectId.
+ * @v: (in) (type MongoObjectId*): A #MongoObjectId.
  *
  * Hashes the bytes of the provided #MongoObjectId using DJB hash.
  * This is suitable for using as a hash function for #GHashTable.
@@ -394,6 +394,27 @@ mongo_object_id_get_data (const MongoObjectId *object_id,
    if (length)
       *length = sizeof object_id->data;
    return object_id->data;
+}
+
+/**
+ * mongo_object_id_get_timeval:
+ * @object_id: (in): A #MongoObjectId.
+ * @tv: (out): A location for a #GTimeVal.
+ *
+ * Gets the timestamp portion of @object_id and stores it in @tv.
+ */
+void
+mongo_object_id_get_timeval (const MongoObjectId *object_id,
+                             GTimeVal            *tv)
+{
+   guint32 t;
+
+   g_return_if_fail(object_id);
+   g_return_if_fail(tv);
+
+   memcpy(&t, object_id, sizeof t);
+   tv->tv_sec = GUINT32_FROM_BE(t);
+   tv->tv_sec = 0;
 }
 
 /**
