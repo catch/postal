@@ -71,6 +71,7 @@ struct _PostalDeviceClass
 };
 
 GQuark            postal_device_error_quark      (void) G_GNUC_CONST;
+GTimeVal         *postal_device_get_created_at   (PostalDevice      *device);
 const gchar      *postal_device_get_device_token (PostalDevice      *device);
 PostalDeviceType  postal_device_get_device_type  (PostalDevice      *device);
 GTimeVal         *postal_device_get_removed_at   (PostalDevice      *device);

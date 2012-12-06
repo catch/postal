@@ -25,6 +25,7 @@ G_DEFINE_TYPE(PostalDevice, postal_device, G_TYPE_OBJECT)
 
 struct _PostalDevicePrivate
 {
+   GTimeVal          created_at;
    gchar            *device_token;
    PostalDeviceType  device_type;
    GTimeVal          removed_at;
@@ -76,6 +77,53 @@ PostalDevice *
 postal_device_new (void)
 {
    return g_object_new(POSTAL_TYPE_DEVICE, NULL);
+}
+
+/**
+ * postal_device_get_created_at:
+ * @device: (in): A #PostalDevice.
+ *
+ * Fetches a #GTimeVal containing the time the device was created in storage.
+ * If the device has not yet been created in storage, then the value is
+ * %NULL.
+ *
+ * Returns: (transfer none): A #GTimeVal or %NULL.
+ */
+GTimeVal *
+postal_device_get_created_at (PostalDevice *device)
+{
+   PostalDevicePrivate *priv;
+
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
+
+   priv = device->priv;
+
+   /*
+    * If created_at is { 0, 0 }, then we just return NULL so the caller
+    * doesn't also have to check for an unset value.
+    */
+   if (!priv->created_at.tv_sec && !priv->created_at.tv_usec) {
+      return NULL;
+   }
+
+   return &device->priv->created_at;
+}
+
+static void
+postal_device_set_created_at (PostalDevice *device,
+                              GTimeVal     *created_at)
+{
+   PostalDevicePrivate *priv;
+
+   g_return_if_fail(POSTAL_IS_DEVICE(device));
+
+   priv = device->priv;
+
+   if (created_at) {
+      priv->created_at = *created_at;
+   } else {
+      memset(&priv->created_at, 0, sizeof priv->created_at);
+   }
 }
 
 /**
@@ -271,8 +319,8 @@ postal_device_load_from_bson (PostalDevice  *device,
    MongoObjectId *oid;
    MongoBsonIter iter;
    const gchar *str;
-   gchar oidstr[25];
    GTimeVal tv;
+   gchar oidstr[25];
 
    ENTRY;
 
@@ -283,7 +331,12 @@ postal_device_load_from_bson (PostalDevice  *device,
 
    mongo_bson_iter_init(&iter, bson);
    while (mongo_bson_iter_next(&iter)) {
-      if (mongo_bson_iter_is_key(&iter, "device_type")) {
+      if (mongo_bson_iter_is_key(&iter, "_id")) {
+         oid = mongo_bson_iter_get_value_object_id(&iter);
+         mongo_object_id_get_timeval(oid, &tv);
+         postal_device_set_created_at(device, &tv);
+         mongo_object_id_free(oid);
+      } else if (mongo_bson_iter_is_key(&iter, "device_type")) {
          str = mongo_bson_iter_get_value_string(&iter, NULL);
          postal_device_set_device_type_string(device, str);
       } else if (mongo_bson_iter_is_key(&iter, "device_token")) {
@@ -394,6 +447,7 @@ postal_device_save_to_json (PostalDevice  *device,
    const gchar *cstr;
    JsonObject *obj;
    JsonNode *node;
+   GTimeVal *tv;
    gchar *str;
 
    g_return_val_if_fail(POSTAL_IS_DEVICE(device), NULL);
@@ -421,7 +475,15 @@ postal_device_save_to_json (PostalDevice  *device,
       json_object_set_null_member(obj, "user");
    }
 
-   if (priv->removed_at.tv_sec || priv->removed_at.tv_usec) {
+   if ((tv = postal_device_get_created_at(device))) {
+      str = g_time_val_to_iso8601(tv);
+      json_object_set_string_member(obj, "created_at", str);
+      g_free(str);
+   } else {
+      json_object_set_null_member(obj, "created_at");
+   }
+
+   if ((tv = postal_device_get_removed_at(device))) {
       str = g_time_val_to_iso8601(&priv->removed_at);
       json_object_set_string_member(obj, "removed_at", str);
       g_free(str);
