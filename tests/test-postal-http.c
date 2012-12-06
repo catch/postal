@@ -112,11 +112,7 @@ add_device_cb (SoupSession *session,
    g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
    g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
    g_assert(!postal_device_get_removed_at(device));
-   /*
-    * TODO: Fix "created_at" field when performing Mongo Update.
-    *
-    * g_assert(postal_device_get_created_at(device));
-    */
+   g_assert(postal_device_get_created_at(device));
 
    g_application_quit(G_APPLICATION(gApplication));
 }
@@ -200,11 +196,7 @@ get_devices2_cb (SoupSession *session,
       g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
       g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
       g_assert(!postal_device_get_removed_at(device));
-      /*
-       * TODO: Make sure we have created at.
-       *
-       * g_assert(postal_device_get_created_at(device));
-       */
+      g_assert(postal_device_get_created_at(device));
    }
 
    g_object_unref(parser);
@@ -274,11 +266,7 @@ get_device_cb (SoupSession *session,
    g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
    g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
    g_assert(!postal_device_get_removed_at(device));
-   /*
-    * TODO: Fix "created_at" field when performing Mongo Update.
-    *
-    * g_assert(postal_device_get_created_at(device));
-    */
+   g_assert(postal_device_get_created_at(device));
 
    g_object_unref(parser);
 
@@ -349,11 +337,7 @@ put_cb (SoupSession *session,
    g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_GCM);
    g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
    g_assert(!postal_device_get_removed_at(device));
-   /*
-    * TODO: Fix this to have created_at on update.
-    *
-    * g_assert(postal_device_get_created_at(device));
-    */
+   g_assert(postal_device_get_created_at(device));
 
    g_object_unref(device);
 
