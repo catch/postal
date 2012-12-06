@@ -88,6 +88,8 @@ MongoBson        *postal_device_save_to_bson     (PostalDevice      *device,
                                                   GError           **error);
 JsonNode         *postal_device_save_to_json     (PostalDevice      *device,
                                                   GError           **error);
+void              postal_device_set_created_at   (PostalDevice      *device,
+                                                  GTimeVal          *created_at);
 void              postal_device_set_device_token (PostalDevice      *device,
                                                   const gchar       *device_token);
 void              postal_device_set_device_type  (PostalDevice      *device,

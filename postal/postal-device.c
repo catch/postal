@@ -109,7 +109,7 @@ postal_device_get_created_at (PostalDevice *device)
    return &device->priv->created_at;
 }
 
-static void
+void
 postal_device_set_created_at (PostalDevice *device,
                               GTimeVal     *created_at)
 {
