@@ -35,6 +35,7 @@ struct _PostalServicePrivate
    PushC2dmClient  *c2dm;
    PushGcmClient   *gcm;
    gchar           *db_and_collection;
+   gchar           *db_and_cmd;
    gchar           *db;
    gchar           *collection;
    PostalMetrics   *metrics;
@@ -55,13 +56,8 @@ postal_service_add_device_cb (GObject      *object,
                               gpointer      user_data)
 {
    GSimpleAsyncResult *simple = user_data;
+   MongoMessageReply *reply = NULL;
    MongoConnection *connection = (MongoConnection *)object;
-   MongoObjectId *oid;
-   MongoBsonIter iter;
-   MongoBson *bson = NULL;
-   GTimeVal tv;
-   gboolean ret;
-   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
@@ -70,25 +66,52 @@ postal_service_add_device_cb (GObject      *object,
    g_assert(G_IS_ASYNC_RESULT(result));
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
-   if (!(ret = mongo_connection_update_finish(connection,
-                                              result,
-                                              &bson,
-                                              &error))) {
+   if (!(reply = mongo_connection_query_finish(connection, result, &error))) {
       g_simple_async_result_take_error(simple, error);
+      GOTO(failure);
    } else {
       PostalService *service;
+      MongoBsonIter iter;
+      MongoBsonIter citer;
       PostalDevice *device;
+      MongoBson *bson = NULL;
+      MongoBson *value;
+      gboolean updated_existing;
+      GList *list;
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
       service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
       updated_existing = FALSE;
 
-      if (mongo_bson_iter_init_find(&iter, bson, "updatedExisting") &&
-          MONGO_BSON_ITER_HOLDS_BOOLEAN(&iter)) {
-         updated_existing = mongo_bson_iter_get_value_boolean(&iter);
+      if (!(list = mongo_message_reply_get_documents(reply))) {
+         g_object_unref(reply);
+         GOTO(failure);
+      }
+
+      bson = list->data;
+
+      g_printerr("%s\n\n\n\n", mongo_bson_to_string(bson, FALSE));
+
+      if (mongo_bson_iter_init_find(&iter, bson, "lastErrorObject") &&
+          MONGO_BSON_ITER_HOLDS_DOCUMENT(&iter) &&
+          mongo_bson_iter_recurse(&iter, &citer) &&
+          mongo_bson_iter_find(&citer, "updatedExisting") &&
+          MONGO_BSON_ITER_HOLDS_BOOLEAN(&citer)) {
+         updated_existing = mongo_bson_iter_get_value_boolean(&citer);
          g_object_set_data(G_OBJECT(simple),
                            "updated-existing",
                            GINT_TO_POINTER(updated_existing));
+      }
+
+      if (mongo_bson_iter_init_find(&iter, bson, "value") &&
+          MONGO_BSON_ITER_HOLDS_DOCUMENT(&iter) &&
+          (value = mongo_bson_iter_get_value_bson(&iter))) {
+         if (!postal_device_load_from_bson(device, value, &error)) {
+            mongo_bson_unref(value);
+            g_object_unref(reply);
+            GOTO(failure);
+         }
+         mongo_bson_unref(value);
       }
 
       if (service->priv->metrics) {
@@ -99,19 +122,12 @@ postal_service_add_device_cb (GObject      *object,
          }
       }
 
-      if (mongo_bson_iter_init_find(&iter, bson, "upserted") &&
-          MONGO_BSON_ITER_HOLDS_OBJECT_ID(&iter)) {
-         oid = mongo_bson_iter_get_value_object_id(&iter);
-         mongo_object_id_get_timeval(oid, &tv);
-         postal_device_set_created_at(device, &tv);
-         mongo_object_id_free(oid);
-      }
-
-      mongo_bson_unref(bson);
+      g_object_unref(reply);
       g_object_unref(service);
    }
 
-   g_simple_async_result_set_op_res_gboolean(simple, ret);
+failure:
+   g_simple_async_result_set_op_res_gboolean(simple, !!reply);
    g_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
 
@@ -142,6 +158,7 @@ postal_service_add_device (PostalService       *service,
    MongoObjectId *oid;
    MongoBsonIter iter;
    MongoBson *bson;
+   MongoBson *cmd;
    MongoBson *q;
    MongoBson *set;
    GError *error = NULL;
@@ -195,6 +212,13 @@ postal_service_add_device (PostalService       *service,
       }
    }
 
+   cmd = mongo_bson_new_empty();
+   mongo_bson_append_string(cmd, "findAndModify", priv->collection);
+   mongo_bson_append_bson(cmd, "query", q);
+   mongo_bson_append_bson(cmd, "update", set);
+   mongo_bson_append_boolean(cmd, "new", TRUE);
+   mongo_bson_append_boolean(cmd, "upsert", TRUE);
+
    /*
     * Asynchronously upsert the document to Mongo.
     */
@@ -205,15 +229,19 @@ postal_service_add_device (PostalService       *service,
                           "device",
                           g_object_ref(device),
                           g_object_unref);
-   mongo_connection_update_async(priv->mongo,
-                                 priv->db_and_collection,
-                                 MONGO_UPDATE_UPSERT,
-                                 q,
-                                 set,
-                                 cancellable,
-                                 postal_service_add_device_cb,
-                                 simple);
 
+   mongo_connection_query_async(priv->mongo,
+                                priv->db_and_cmd,
+                                MONGO_QUERY_EXHAUST,
+                                0,
+                                1,
+                                cmd,
+                                NULL,
+                                NULL, /* TODO: */
+                                postal_service_add_device_cb,
+                                simple);
+
+   mongo_bson_unref(cmd);
    mongo_bson_unref(bson);
    mongo_bson_unref(q);
    mongo_bson_unref(set);
@@ -1470,6 +1498,9 @@ postal_service_start (NeoServiceBase *base,
       priv->db_and_collection = g_strdup_printf("%s.%s",
                                                 priv->db,
                                                 priv->collection);
+
+      g_free(priv->db_and_cmd);
+      priv->db_and_cmd = g_strdup_printf("%s.$cmd", priv->db);
    }
 #undef GET_STRING_KEY
 
@@ -1529,6 +1560,11 @@ postal_service_finalize (GObject *object)
    g_clear_object(&priv->mongo);
    g_clear_object(&priv->metrics);
 
+   g_free(priv->db);
+   g_free(priv->collection);
+   g_free(priv->db_and_cmd);
+   g_free(priv->db_and_collection);
+
    G_OBJECT_CLASS(postal_service_parent_class)->finalize(object);
 
    EXIT;
@@ -1560,6 +1596,7 @@ postal_service_init (PostalService *service)
    service->priv = G_TYPE_INSTANCE_GET_PRIVATE(service,
                                                POSTAL_TYPE_SERVICE,
                                                PostalServicePrivate);
+   service->priv->db_and_cmd = g_strdup("test.$cmd");
    service->priv->db_and_collection = g_strdup("test.devices");
    service->priv->db = g_strdup("test");
    service->priv->collection = g_strdup("devices");
