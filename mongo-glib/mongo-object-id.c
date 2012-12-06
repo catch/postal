@@ -414,7 +414,7 @@ mongo_object_id_get_timeval (const MongoObjectId *object_id,
 
    memcpy(&t, object_id, sizeof t);
    tv->tv_sec = GUINT32_FROM_BE(t);
-   tv->tv_sec = 0;
+   tv->tv_usec = 0;
 }
 
 /**
