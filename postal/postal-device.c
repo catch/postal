@@ -521,6 +521,7 @@ postal_device_load_from_json (PostalDevice  *device,
 {
    const gchar *str;
    JsonObject *obj;
+   GTimeVal tv;
 
    ENTRY;
 
@@ -567,6 +568,18 @@ postal_device_load_from_json (PostalDevice  *device,
    if (json_object_has_member(obj, "user") &&
        (str = json_object_get_string_member(obj, "user"))) {
       postal_device_set_user(device, str);
+   }
+
+   if (json_object_has_member(obj, "removed_at") &&
+       (str = json_object_get_string_member(obj, "removed_at"))) {
+      g_time_val_from_iso8601(str, &tv);
+      postal_device_set_removed_at(device, &tv);
+   }
+
+   if (json_object_has_member(obj, "created_at") &&
+       (str = json_object_get_string_member(obj, "created_at"))) {
+      g_time_val_from_iso8601(str, &tv);
+      postal_device_set_created_at(device, &tv);
    }
 
    RETURN(TRUE);
