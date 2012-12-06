@@ -71,85 +71,85 @@ struct _MongoProtocolClass
    GObjectClass parent_class;
 };
 
-GQuark      mongo_protocol_error_quark         (void) G_GNUC_CONST;
-GType       mongo_protocol_get_type            (void) G_GNUC_CONST;
-GIOStream  *mongo_protocol_get_io_stream       (MongoProtocol        *protocol);
-void        mongo_protocol_fail                (MongoProtocol        *protocol,
-                                                const GError         *error);
-void        mongo_protocol_update_async        (MongoProtocol        *protocol,
-                                                const gchar          *db_and_collection,
-                                                MongoUpdateFlags      flags,
-                                                const MongoBson      *selector,
-                                                const MongoBson      *update,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
-gboolean    mongo_protocol_update_finish       (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                gboolean             *updated_existing,
-                                                GError              **error);
-void        mongo_protocol_insert_async        (MongoProtocol        *protocol,
-                                                const gchar          *db_and_collection,
-                                                MongoInsertFlags      flags,
-                                                MongoBson           **documents,
-                                                gsize                 n_documents,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
-gboolean    mongo_protocol_insert_finish       (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_query_async         (MongoProtocol        *protocol,
-                                                const gchar          *db_and_collection,
-                                                MongoQueryFlags       flags,
-                                                guint32               skip,
-                                                guint32               limit,
-                                                const MongoBson      *query,
-                                                const MongoBson      *field_selector,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
+GQuark             mongo_protocol_error_quark         (void) G_GNUC_CONST;
+GType              mongo_protocol_get_type            (void) G_GNUC_CONST;
+GIOStream         *mongo_protocol_get_io_stream       (MongoProtocol        *protocol);
+void               mongo_protocol_fail                (MongoProtocol        *protocol,
+                                                       const GError         *error);
+void               mongo_protocol_update_async        (MongoProtocol        *protocol,
+                                                       const gchar          *db_and_collection,
+                                                       MongoUpdateFlags      flags,
+                                                       const MongoBson      *selector,
+                                                       const MongoBson      *update,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean           mongo_protocol_update_finish       (MongoProtocol        *protocol,
+                                                       GAsyncResult         *result,
+                                                       MongoBson           **document,
+                                                       GError              **error);
+void               mongo_protocol_insert_async        (MongoProtocol        *protocol,
+                                                       const gchar          *db_and_collection,
+                                                       MongoInsertFlags      flags,
+                                                       MongoBson           **documents,
+                                                       gsize                 n_documents,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean           mongo_protocol_insert_finish       (MongoProtocol        *protocol,
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_query_async         (MongoProtocol        *protocol,
+                                                       const gchar          *db_and_collection,
+                                                       MongoQueryFlags       flags,
+                                                       guint32               skip,
+                                                       guint32               limit,
+                                                       const MongoBson      *query,
+                                                       const MongoBson      *field_selector,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
 MongoMessageReply *mongo_protocol_query_finish        (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_getmore_async       (MongoProtocol        *protocol,
-                                                const gchar          *db_and_collection,
-                                                guint32               limit,
-                                                guint64               cursor_id,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_getmore_async       (MongoProtocol        *protocol,
+                                                       const gchar          *db_and_collection,
+                                                       guint32               limit,
+                                                       guint64               cursor_id,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
 MongoMessageReply *mongo_protocol_getmore_finish      (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_delete_async        (MongoProtocol        *protocol,
-                                                const gchar          *db_and_collection,
-                                                MongoDeleteFlags      flags,
-                                                const MongoBson      *selector,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
-gboolean    mongo_protocol_delete_finish       (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_kill_cursors_async  (MongoProtocol        *protocol,
-                                                guint64              *cursors,
-                                                gsize                 n_cursors,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
-gboolean    mongo_protocol_kill_cursors_finish (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_msg_async           (MongoProtocol        *protocol,
-                                                const gchar          *message,
-                                                GCancellable         *cancellable,
-                                                GAsyncReadyCallback   callback,
-                                                gpointer              user_data);
-gboolean    mongo_protocol_msg_finish          (MongoProtocol        *protocol,
-                                                GAsyncResult         *result,
-                                                GError              **error);
-void        mongo_protocol_flush_sync          (MongoProtocol        *protocol);
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_delete_async        (MongoProtocol        *protocol,
+                                                       const gchar          *db_and_collection,
+                                                       MongoDeleteFlags      flags,
+                                                       const MongoBson      *selector,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean           mongo_protocol_delete_finish       (MongoProtocol        *protocol,
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_kill_cursors_async  (MongoProtocol        *protocol,
+                                                       guint64              *cursors,
+                                                       gsize                 n_cursors,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean           mongo_protocol_kill_cursors_finish (MongoProtocol        *protocol,
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_msg_async           (MongoProtocol        *protocol,
+                                                       const gchar          *message,
+                                                       GCancellable         *cancellable,
+                                                       GAsyncReadyCallback   callback,
+                                                       gpointer              user_data);
+gboolean           mongo_protocol_msg_finish          (MongoProtocol        *protocol,
+                                                       GAsyncResult         *result,
+                                                       GError              **error);
+void               mongo_protocol_flush_sync          (MongoProtocol        *protocol);
 
 G_END_DECLS
 

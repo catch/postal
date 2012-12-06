@@ -358,24 +358,26 @@ mongo_protocol_update_async (MongoProtocol       *protocol,
  * mongo_protocol_update_finish:
  * @protocol: (in): A #MongoProtocol.
  * @result: (in): A #GAsyncResult.
- * @updated_existing: (out) (allow-none): A location for a #gboolean.
+ * @document: (out) (allow-none) (transfer full): A location for a #MongoBson
+ *   result document, or %NULL.
  * @error: (out): A location for a #GError, or %NULL.
  *
  * Completes an asynchronous request to update the MongoDB database.
- * If @updated_existing is not %NULL, then it will be set to %TRUE if a
- * document was updated. Otherwise %FALSE.
+ *
+ * If @document is not %NULL, then it will be set to the result document
+ * that was returned from the Mongo server when performing the
+ * getlasterror command (if provided).
  *
  * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
  */
 gboolean
 mongo_protocol_update_finish (MongoProtocol  *protocol,
                               GAsyncResult   *result,
-                              gboolean       *updated_existing,
+                              MongoBson     **document,
                               GError        **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
    MongoMessageReply *reply;
-   MongoBsonIter iter;
    GList *list;
 
    ENTRY;
@@ -387,15 +389,9 @@ mongo_protocol_update_finish (MongoProtocol  *protocol,
       g_simple_async_result_propagate_error(simple, error);
    }
 
-   if (updated_existing) {
-      *updated_existing = FALSE;
-      if ((list = mongo_message_reply_get_documents(reply))) {
-         if (mongo_bson_iter_init_find(&iter, list->data, "updatedExisting")) {
-            if (MONGO_BSON_ITER_HOLDS_BOOLEAN(&iter)) {
-               *updated_existing = mongo_bson_iter_get_value_boolean(&iter);
-            }
-         }
-      }
+   if (document) {
+      list = mongo_message_reply_get_documents(reply);
+      *document = list ? mongo_bson_ref(list->data) : NULL;
    }
 
    RETURN(!!reply);

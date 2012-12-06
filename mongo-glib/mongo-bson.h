@@ -178,13 +178,36 @@ G_BEGIN_DECLS
 #define MONGO_BSON_ITER_HOLDS_INT64(b) \
    (MONGO_BSON_ITER_HOLDS(b, MONGO_BSON_INT64))
 
+/**
+ * MongoBson:
+ * @data (array length=len): The raw bson buffer.
+ * @len: The length of @data.
+ *
+ * #MongoBson represents a document serialized using the BSON format. More
+ * information on BSON can be found at http://bsonspec.org .
+ *
+ * You can iterate through the fields in a #MongoBson using #MongoBsonIter.
+ */
 typedef struct _MongoBson MongoBson;
 
-struct _MongoBson
-{
-   guint8 *data;
-   guint   len;
-};
+/**
+ * MongoBsonIter:
+ * @user_data1: A pointer to the raw data.
+ * @user_data2: The length of @user_data1.
+ * @user_data3: Current offset in the buffer.
+ * @user_data4: Pointer to current key.
+ * @user_data5: Pointer to current type.
+ * @user_data6: Pointer to first value for mutli-value fields.
+ * @user_data7: Pointer to second value for multi-value fields.
+ * @flags: flags used while parsing data.
+ * @reserved1: reserved for future use.
+ *
+ * #MongoBsonIter is used to iterate through the contents of a #MongoBson.
+ * It is meant to be used on the stack and can allow for reading data
+ * directly out of the #MongoBson without having to malloc a copy. This
+ * can be handy when dealing with lots of medium to large sized documents.
+ */
+typedef struct _MongoBsonIter MongoBsonIter;
 
 /**
  * MongoBsonType:
@@ -220,15 +243,13 @@ typedef enum
    MONGO_BSON_INT64     = 0x12,
 } MongoBsonType;
 
-/**
- * MongoBsonIter:
- *
- * #MongoBsonIter is used to iterate through the contents of a #MongoBson.
- * It is meant to be used on the stack and can allow for reading data
- * directly out of the #MongoBson without having to malloc a copy. This
- * can be handy when dealing with lots of medium to large sized documents.
- */
-typedef struct
+struct _MongoBson
+{
+   guint8 *data;
+   guint   len;
+};
+
+struct _MongoBsonIter
 {
    /*< private >*/
    gpointer user_data1; /* Raw data buffer */
@@ -239,7 +260,8 @@ typedef struct
    gpointer user_data6; /* Value1 */
    gpointer user_data7; /* Value2 */
    gint32   flags;
-} MongoBsonIter;
+   gint32   reserved1;
+};
 
 GType          mongo_bson_get_type                 (void) G_GNUC_CONST;
 GType          mongo_bson_type_get_type            (void) G_GNUC_CONST;

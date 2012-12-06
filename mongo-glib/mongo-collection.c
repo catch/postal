@@ -574,14 +574,13 @@ mongo_collection_update_cb (GObject      *object,
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
    gboolean ret;
-   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
 
    if (!(ret = mongo_connection_update_finish(connection,
                                               result,
-                                              &updated_existing,
+                                              NULL,
                                               &error))) {
       g_simple_async_result_take_error(simple, error);
    }

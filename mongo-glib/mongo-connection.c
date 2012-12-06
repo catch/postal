@@ -174,8 +174,8 @@ mongo_connection_update_cb (GObject      *object,
 {
    GSimpleAsyncResult *simple = user_data;
    MongoProtocol *protocol = (MongoProtocol *)object;
+   MongoBson *bson;
    gboolean ret;
-   gboolean updated_existing = FALSE;
    GError *error = NULL;
 
    ENTRY;
@@ -185,15 +185,17 @@ mongo_connection_update_cb (GObject      *object,
 
    if (!(ret = mongo_protocol_update_finish(protocol,
                                             result,
-                                            &updated_existing,
+                                            &bson,
                                             &error))) {
       g_simple_async_result_take_error(simple, error);
+   } else {
+      g_object_set_data_full(G_OBJECT(simple),
+                             "document",
+                             bson,
+                             (GDestroyNotify)mongo_bson_unref);
    }
 
    g_simple_async_result_set_op_res_gboolean(simple, ret);
-   g_object_set_data(G_OBJECT(simple),
-                     "updated-existing",
-                     GINT_TO_POINTER(updated_existing));
    mongo_simple_async_result_complete_in_idle(simple);
    g_object_unref(simple);
 
@@ -1211,23 +1213,27 @@ mongo_connection_update_async (MongoConnection     *connection,
  * mongo_connection_update_finish:
  * @connection: A #MongoConnection.
  * @result: A #GAsyncResult.
- * @updated_existing: (out) (allow-none): A location for a #gboolean.
+ * @document: (out) (allow-none) (transfer full): A location for the result
+ *   document if provided by the server.
  * @error: (allow-none) (out): A location for a #GError, or %NULL.
  *
  * Completes an asynchronous request to mongo_connection_update_async().
  *
- * If @updated_existing is not %NULL, then it will be set to %TRUE if an
- * existing document was updated. Otherwise %FALSE.
+ * If @document is not %NULL, then it will store the resulting document
+ * provided by the server in that location. The caller is responsible for
+ * freeing that data. This can be useful if you need to know if
+ * "updatedExisting" was set when performing a %MONGO_UPDATE_UPSERT
  *
  * Returns: %TRUE if successful; otherwise %FALSE and @error is set.
  */
 gboolean
 mongo_connection_update_finish (MongoConnection  *connection,
                                 GAsyncResult     *result,
-                                gboolean         *updated_existing,
+                                MongoBson       **document,
                                 GError          **error)
 {
    GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
+   MongoBson *bson;
    gboolean ret;
 
    g_return_val_if_fail(MONGO_IS_CONNECTION(connection), FALSE);
@@ -1239,10 +1245,9 @@ mongo_connection_update_finish (MongoConnection  *connection,
       g_simple_async_result_propagate_error(simple, error);
    }
 
-   if (updated_existing) {
-      *updated_existing =
-         GPOINTER_TO_INT(g_object_get_data(G_OBJECT(result),
-                                           "updated-existing"));
+   if (document) {
+      bson = g_object_get_data(G_OBJECT(result), "document");
+      *document = bson ? mongo_bson_ref(bson) : NULL;
    }
 
    RETURN(ret);
