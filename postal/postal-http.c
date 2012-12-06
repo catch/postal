@@ -453,10 +453,7 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
          g_error_free(error);
          EXIT;
       }
-      pdev = g_object_new(POSTAL_TYPE_DEVICE,
-                          "device-token", device,
-                          "user", user,
-                          NULL);
+      pdev = postal_device_new();
       if (!postal_device_load_from_json(pdev, node, &error)) {
          postal_http_reply_error(http, message, error);
          soup_server_unpause_message(server, message);
@@ -466,6 +463,7 @@ postal_http_handle_v1_users_user_devices_device (UrlRouter         *router,
          EXIT;
       }
       postal_device_set_device_token(pdev, device);
+      postal_device_set_user(pdev, user);
       json_node_free(node);
       g_object_set_data_full(G_OBJECT(message),
                              "device",
