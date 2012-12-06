@@ -1,4 +1,5 @@
 #include <postal/postal-application.h>
+#include <postal/postal-device.h>
 #include <libsoup/soup.h>
 #include <string.h>
 
@@ -76,6 +77,11 @@ add_device_cb (SoupSession *session,
                SoupMessage *message,
                gpointer     user_data)
 {
+   PostalDevice *device;
+   JsonParser *parser;
+   JsonNode *node;
+   gboolean r;
+   GError *error = NULL;
    gchar *str;
 
    g_assert(SOUP_IS_SESSION(session));
@@ -83,16 +89,34 @@ add_device_cb (SoupSession *session,
 
    g_assert_cmpint(message->status_code, ==, 201);
 
-   str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064u\",\n"
-                         "  \"device_type\" : \"c2dm\",\n"
-                         "  \"user\" : \"%s\",\n"
-                         "  \"removed_at\" : null\n"
-                         "}",
-                         gC2dmDeviceId,
-                         gAccount);
-   g_assert_cmpstr(message->response_body->data, ==, str);
+   parser = json_parser_new();
+   r = json_parser_load_from_data(parser,
+                                  message->response_body->data,
+                                  message->response_body->length,
+                                  &error);
+   node = json_parser_get_root(parser);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   device = postal_device_new();
+   r = postal_device_load_from_json(device, node, &error);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   g_object_unref(parser);
+
+   str = g_strdup_printf("%064u", gC2dmDeviceId);
+   g_assert_cmpstr(str, ==, postal_device_get_device_token(device));
    g_free(str);
+
+   g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
+   g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
+   g_assert(!postal_device_get_removed_at(device));
+   /*
+    * TODO: Fix "created_at" field when performing Mongo Update.
+    *
+    * g_assert(postal_device_get_created_at(device));
+    */
 
    g_application_quit(G_APPLICATION(gApplication));
 }
@@ -135,6 +159,13 @@ get_devices2_cb (SoupSession *session,
                  SoupMessage *message,
                  gpointer     user_data)
 {
+   PostalDevice *device;
+   JsonParser *parser;
+   JsonNode *node;
+   gboolean r;
+   GError *error = NULL;
+   GList *elements;
+   GList *iter;
    gchar *str;
 
    g_assert(SOUP_IS_SESSION(session));
@@ -142,18 +173,41 @@ get_devices2_cb (SoupSession *session,
 
    g_assert_cmpint(message->status_code, ==, 200);
 
-   str = g_strdup_printf("[\n"
-                         "  {\n"
-                         "    \"device_token\" : \"%064u\",\n"
-                         "    \"device_type\" : \"c2dm\",\n"
-                         "    \"user\" : \"%s\",\n"
-                         "    \"removed_at\" : null\n"
-                         "  }\n"
-                         "]",
-                         gC2dmDeviceId,
-                         gAccount);
-   g_assert_cmpstr(message->response_body->data, ==, str);
-   g_free(str);
+   parser = json_parser_new();
+   r = json_parser_load_from_data(parser,
+                                  message->response_body->data,
+                                  message->response_body->length,
+                                  &error);
+   node = json_parser_get_root(parser);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   g_assert(JSON_NODE_HOLDS_ARRAY(node));
+
+   elements = json_array_get_elements(json_node_get_array(node));
+   g_assert_cmpint(1, ==, g_list_length(elements));
+
+   for (iter = elements; iter; iter = iter->next) {
+      device = postal_device_new();
+      r = postal_device_load_from_json(device, iter->data, &error);
+      g_assert_no_error(error);
+      g_assert(r);
+
+      str = g_strdup_printf("%064u", gC2dmDeviceId);
+      g_assert_cmpstr(str, ==, postal_device_get_device_token(device));
+      g_free(str);
+
+      g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
+      g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
+      g_assert(!postal_device_get_removed_at(device));
+      /*
+       * TODO: Make sure we have created at.
+       *
+       * g_assert(postal_device_get_created_at(device));
+       */
+   }
+
+   g_object_unref(parser);
 
    g_application_quit(G_APPLICATION(gApplication));
 }
@@ -187,6 +241,11 @@ get_device_cb (SoupSession *session,
                SoupMessage *message,
                gpointer     user_data)
 {
+   PostalDevice *device;
+   JsonParser *parser;
+   JsonNode *node;
+   gboolean r;
+   GError *error = NULL;
    gchar *str;
 
    g_assert(SOUP_IS_SESSION(session));
@@ -194,16 +253,34 @@ get_device_cb (SoupSession *session,
 
    g_assert_cmpint(message->status_code, ==, 200);
 
-   str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064u\",\n"
-                         "  \"device_type\" : \"c2dm\",\n"
-                         "  \"user\" : \"%s\",\n"
-                         "  \"removed_at\" : null\n"
-                         "}",
-                         gC2dmDeviceId,
-                         gAccount);
-   g_assert_cmpstr(message->response_body->data, ==, str);
+   parser = json_parser_new();
+   r = json_parser_load_from_data(parser,
+                                  message->response_body->data,
+                                  message->response_body->length,
+                                  &error);
+   node = json_parser_get_root(parser);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   device = postal_device_new();
+   r = postal_device_load_from_json(device, node, &error);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   str = g_strdup_printf("%064u", gC2dmDeviceId);
+   g_assert_cmpstr(str, ==, postal_device_get_device_token(device));
    g_free(str);
+
+   g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_C2DM);
+   g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
+   g_assert(!postal_device_get_removed_at(device));
+   /*
+    * TODO: Fix "created_at" field when performing Mongo Update.
+    *
+    * g_assert(postal_device_get_created_at(device));
+    */
+
+   g_object_unref(parser);
 
    g_application_quit(G_APPLICATION(gApplication));
 }
@@ -237,6 +314,11 @@ put_cb (SoupSession *session,
         SoupMessage *message,
         gpointer     user_data)
 {
+   PostalDevice *device;
+   JsonParser *parser;
+   JsonNode *node;
+   gboolean r;
+   GError *error = NULL;
    gchar *str;
 
    g_assert(SOUP_IS_SESSION(session));
@@ -244,16 +326,36 @@ put_cb (SoupSession *session,
 
    g_assert_cmpint(message->status_code, ==, 200);
 
-   str = g_strdup_printf("{\n"
-                         "  \"device_token\" : \"%064u\",\n"
-                         "  \"device_type\" : \"gcm\",\n"
-                         "  \"user\" : \"%s\",\n"
-                         "  \"removed_at\" : null\n"
-                         "}",
-                         gC2dmDeviceId,
-                         gAccount);
-   g_assert_cmpstr(message->response_body->data, ==, str);
+   parser = json_parser_new();
+   r = json_parser_load_from_data(parser,
+                                  message->response_body->data,
+                                  message->response_body->length,
+                                  &error);
+   node = json_parser_get_root(parser);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   device = postal_device_new();
+   r = postal_device_load_from_json(device, node, &error);
+   g_assert_no_error(error);
+   g_assert(r);
+
+   g_object_unref(parser);
+
+   str = g_strdup_printf("%064u", gC2dmDeviceId);
+   g_assert_cmpstr(str, ==, postal_device_get_device_token(device));
    g_free(str);
+
+   g_assert(postal_device_get_device_type(device) == POSTAL_DEVICE_GCM);
+   g_assert_cmpstr(postal_device_get_user(device), ==, gAccount);
+   g_assert(!postal_device_get_removed_at(device));
+   /*
+    * TODO: Fix this to have created_at on update.
+    *
+    * g_assert(postal_device_get_created_at(device));
+    */
+
+   g_object_unref(device);
 
    g_application_quit(G_APPLICATION(gApplication));
 }
