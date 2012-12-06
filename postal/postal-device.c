@@ -564,6 +564,11 @@ postal_device_load_from_json (PostalDevice  *device,
    str = json_object_get_string_member(obj, "device_token");
    postal_device_set_device_token(device, str);
 
+   if (json_object_has_member(obj, "user") &&
+       (str = json_object_get_string_member(obj, "user"))) {
+      postal_device_set_user(device, str);
+   }
+
    RETURN(TRUE);
 }
 
