@@ -56,8 +56,12 @@ postal_service_add_device_cb (GObject      *object,
 {
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
-   gboolean updated_existing;
+   MongoObjectId *oid;
+   MongoBsonIter iter;
+   MongoBson *bson = NULL;
+   GTimeVal tv;
    gboolean ret;
+   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
@@ -68,7 +72,7 @@ postal_service_add_device_cb (GObject      *object,
 
    if (!(ret = mongo_connection_update_finish(connection,
                                               result,
-                                              &updated_existing,
+                                              &bson,
                                               &error))) {
       g_simple_async_result_take_error(simple, error);
    } else {
@@ -77,6 +81,16 @@ postal_service_add_device_cb (GObject      *object,
 
       device = POSTAL_DEVICE(g_object_get_data(G_OBJECT(simple), "device"));
       service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
+      updated_existing = FALSE;
+
+      if (mongo_bson_iter_init_find(&iter, bson, "updatedExisting") &&
+          MONGO_BSON_ITER_HOLDS_BOOLEAN(&iter)) {
+         updated_existing = mongo_bson_iter_get_value_boolean(&iter);
+         g_object_set_data(G_OBJECT(simple),
+                           "updated-existing",
+                           GINT_TO_POINTER(updated_existing));
+      }
+
       if (service->priv->metrics) {
          if (updated_existing) {
             postal_metrics_device_added(service->priv->metrics, device);
@@ -84,12 +98,18 @@ postal_service_add_device_cb (GObject      *object,
             postal_metrics_device_updated(service->priv->metrics, device);
          }
       }
+
+      if (mongo_bson_iter_init_find(&iter, bson, "upserted") &&
+          MONGO_BSON_ITER_HOLDS_OBJECT_ID(&iter)) {
+         oid = mongo_bson_iter_get_value_object_id(&iter);
+         mongo_object_id_get_timeval(oid, &tv);
+         postal_device_set_created_at(device, &tv);
+         mongo_object_id_free(oid);
+      }
+
+      mongo_bson_unref(bson);
       g_object_unref(service);
    }
-
-   g_object_set_data(G_OBJECT(simple),
-                     "updated-existing",
-                     GINT_TO_POINTER(updated_existing));
 
    g_simple_async_result_set_op_res_gboolean(simple, ret);
    g_simple_async_result_complete_in_idle(simple);
@@ -248,7 +268,6 @@ postal_service_remove_device_cb (GObject      *object,
 {
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
-   gboolean updated_existing;
    gboolean ret;
    GError *error = NULL;
 
@@ -260,7 +279,7 @@ postal_service_remove_device_cb (GObject      *object,
 
    if (!(ret = mongo_connection_update_finish(connection,
                                               result,
-                                              &updated_existing,
+                                              NULL,
                                               &error))) {
       g_simple_async_result_take_error(simple, error);
    } else {
@@ -1184,7 +1203,6 @@ postal_service_aps_identity_removed_cb (GObject      *object,
                                         gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
-   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
@@ -1193,14 +1211,10 @@ postal_service_aps_identity_removed_cb (GObject      *object,
 
    if (!mongo_connection_update_finish(connection,
                                        result,
-                                       &updated_existing,
+                                       NULL,
                                        &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
-   } else if (!updated_existing) {
-      /*
-       * XXX: Should we log this?
-       */
    }
 
    EXIT;
@@ -1259,7 +1273,6 @@ postal_service_c2dm_identity_removed_cb (GObject      *object,
                                          gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
-   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
@@ -1268,14 +1281,10 @@ postal_service_c2dm_identity_removed_cb (GObject      *object,
 
    if (!mongo_connection_update_finish(connection,
                                        result,
-                                       &updated_existing,
+                                       NULL,
                                        &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
-   } else if (!updated_existing) {
-      /*
-       * TODO: Should we log this?
-       */
    }
 
    EXIT;
@@ -1334,7 +1343,6 @@ postal_service_gcm_identity_removed_cb (GObject      *object,
                                         gpointer      user_data)
 {
    MongoConnection *connection = (MongoConnection *)object;
-   gboolean updated_existing;
    GError *error = NULL;
 
    ENTRY;
@@ -1343,14 +1351,10 @@ postal_service_gcm_identity_removed_cb (GObject      *object,
 
    if (!mongo_connection_update_finish(connection,
                                        result,
-                                       &updated_existing,
+                                       NULL,
                                        &error)) {
       g_message("Device removal failed: %s\n", error->message);
       g_error_free(error);
-   } else if (!updated_existing) {
-      /*
-       * TODO: Should we log this?
-       */
    }
 
    EXIT;
