@@ -80,7 +80,7 @@ mongo_message_kill_cursors_load_from_data (MongoMessage *message,
                length -= sizeof cursor;
             }
             g_free(priv->cursors);
-            priv->cursors = (guint64 *)g_array_free(cursors, FALSE);
+            priv->cursors = (guint64 *)(gpointer)g_array_free(cursors, FALSE);
             priv->n_cursors = n_cursors;
             RETURN(TRUE);
          }

@@ -28,6 +28,7 @@
 G_BEGIN_DECLS
 
 #define MONGO_TYPE_MESSAGE            (mongo_message_get_type())
+#define MONGO_MESSAGE_ERROR           (mongo_message_error_quark())
 #define MONGO_MESSAGE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), MONGO_TYPE_MESSAGE, MongoMessage))
 #define MONGO_MESSAGE_CONST(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), MONGO_TYPE_MESSAGE, MongoMessage const))
 #define MONGO_MESSAGE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  MONGO_TYPE_MESSAGE, MongoMessageClass))
@@ -38,10 +39,16 @@ G_BEGIN_DECLS
 typedef struct _MongoMessage        MongoMessage;
 typedef struct _MongoMessageClass   MongoMessageClass;
 typedef struct _MongoMessagePrivate MongoMessagePrivate;
+typedef enum   _MongoMessageError   MongoMessageError;
+
+enum _MongoMessageError
+{
+   MONGO_MESSAGE_ERROR_INVALID_MESSAGE = 1,
+};
 
 struct _MongoMessage
 {
-   GInitiallyUnowned parent;
+   GObject parent;
 
    /*< private >*/
    MongoMessagePrivate *priv;
@@ -49,7 +56,7 @@ struct _MongoMessage
 
 struct _MongoMessageClass
 {
-   GInitiallyUnownedClass parent_class;
+   GObjectClass parent_class;
 
    MongoOperation operation;
 
@@ -59,6 +66,9 @@ struct _MongoMessageClass
 
    guint8   *(*save_to_data)   (MongoMessage *message,
                                 gsize        *length);
+
+   GBytes   *(*save_to_bytes)  (MongoMessage  *message,
+                                GError       **error);
 
    gpointer _reserved1;
    gpointer _reserved2;
@@ -70,6 +80,7 @@ struct _MongoMessageClass
    gpointer _reserved8;
 };
 
+GQuark        mongo_message_error_quark     (void) G_GNUC_CONST;
 GType         mongo_message_get_type        (void) G_GNUC_CONST;
 gint          mongo_message_get_request_id  (MongoMessage    *message);
 MongoMessage *mongo_message_get_reply       (MongoMessage    *message);
@@ -79,6 +90,8 @@ gboolean      mongo_message_load_from_data  (MongoMessage    *message,
                                              gsize            length);
 guint8       *mongo_message_save_to_data    (MongoMessage    *message,
                                              gsize           *length);
+GBytes       *mongo_message_save_to_bytes   (MongoMessage    *message,
+                                             GError          **error);
 void          mongo_message_set_request_id  (MongoMessage    *message,
                                              gint             request_id);
 void          mongo_message_set_reply       (MongoMessage    *message,

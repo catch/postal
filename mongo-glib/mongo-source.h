@@ -23,6 +23,23 @@
 
 G_BEGIN_DECLS
 
+/**
+ * MongoSource:
+ *
+ * #MongoSource is a #GSource for completing asynchronous mongo requests.
+ * It can be attached to a given #GMainContext so that requests complete
+ * in a particular thread.
+ *
+ * Typically, you would use #MongoClient:async-context to specify the
+ * thread you want to complete requests within and #MongoClient with use
+ * #MongoSource to ensure they are completed there.
+ */
+typedef struct _MongoSource MongoSource;
+
+MongoSource *mongo_source_new              (void);
+void         mongo_source_complete_in_idle (MongoSource        *source,
+                                            GSimpleAsyncResult *simple);
+
 void mongo_simple_async_result_complete_in_idle (GSimpleAsyncResult *simple);
 
 G_END_DECLS

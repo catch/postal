@@ -19,6 +19,7 @@
 #include <glib/gi18n.h>
 
 #include "mongo-debug.h"
+#include "mongo-input-stream.h"
 #include "mongo-protocol.h"
 #include "mongo-source.h"
 
@@ -34,15 +35,10 @@
 
 G_DEFINE_TYPE(MongoProtocol, mongo_protocol, G_TYPE_OBJECT)
 
-static void
-mongo_protocol_fill_header_cb (GBufferedInputStream *input_stream,
-                               GAsyncResult         *result,
-                               MongoProtocol        *protocol);
-
 struct _MongoProtocolPrivate
 {
    GIOStream *io_stream;
-   GInputStream *input_stream;
+   MongoInputStream *input_stream;
    GOutputStream *output_stream;
    guint32 last_request_id;
    GCancellable *shutdown;
@@ -68,6 +64,7 @@ enum
 
 enum
 {
+   MESSAGE_READ,
    FAILED,
    LAST_SIGNAL
 };
@@ -122,6 +119,22 @@ mongo_protocol_overwrite_int32 (GByteArray *array,
    EXIT;
 }
 
+static gint32
+mongo_protocol_next_request_id (MongoProtocol *protocol)
+{
+   MongoProtocolPrivate *priv;
+
+   g_assert(MONGO_IS_PROTOCOL(protocol));
+
+   priv = protocol->priv;
+
+   if (priv->last_request_id >= G_MAXINT32) {
+      priv->last_request_id = 0;
+   }
+
+   return ++priv->last_request_id;
+}
+
 void
 mongo_protocol_fail (MongoProtocol *protocol,
                      const GError  *error)
@@ -140,6 +153,7 @@ mongo_protocol_fail (MongoProtocol *protocol,
 
    if (error) {
       local_error = g_error_copy(error);
+      g_warning("%s(): %s", G_STRFUNC, error->message);
    } else {
       local_error = g_error_new(MONGO_PROTOCOL_ERROR,
                                 MONGO_PROTOCOL_ERROR_UNEXPECTED,
@@ -320,7 +334,7 @@ mongo_protocol_update_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_update_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -427,7 +441,7 @@ mongo_protocol_insert_async (MongoProtocol        *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_insert_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -511,7 +525,7 @@ mongo_protocol_query_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_query_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -595,7 +609,7 @@ mongo_protocol_getmore_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_getmore_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -676,7 +690,7 @@ mongo_protocol_delete_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_delete_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -756,7 +770,7 @@ mongo_protocol_kill_cursors_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_kill_cursors_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -823,7 +837,7 @@ mongo_protocol_msg_async (MongoProtocol       *protocol,
    simple = g_simple_async_result_new(G_OBJECT(protocol), callback, user_data,
                                       mongo_protocol_msg_async);
 
-   request_id = ++priv->last_request_id;
+   request_id = mongo_protocol_next_request_id(protocol);
 
    buffer = g_byte_array_new();
    mongo_protocol_append_int32(buffer, 0);
@@ -878,219 +892,60 @@ mongo_protocol_get_io_stream (MongoProtocol *protocol)
 }
 
 static void
-mongo_protocol_fill_message_cb (GBufferedInputStream *input_stream,
-                                GAsyncResult         *result,
-                                MongoProtocol        *protocol)
+mongo_protocol_read_message_cb (GObject      *object,
+                                GAsyncResult *result,
+                                gpointer      user_data)
 {
    MongoProtocolPrivate *priv;
    GSimpleAsyncResult *request;
-   const guint8 *buffer;
-   MongoMessageReply *reply;
+   MongoInputStream *input_stream = (MongoInputStream *)object;
+   MongoProtocol *protocol = user_data;
+   MongoMessage *message;
    GError *error = NULL;
-   guint8 *reply_buffer = NULL;
-   gsize count;
-#pragma pack(push, 1)
-   struct {
-      guint32 msg_len;
-      guint32 request_id;
-      guint32 response_to;
-      guint32 op_code;
-   } header;
-#pragma pack(pop)
+   gint32 response_to;
 
-   ENTRY;
+   g_assert(MONGO_IS_INPUT_STREAM(input_stream));
 
-   g_assert(G_IS_BUFFERED_INPUT_STREAM(input_stream));
-   g_assert(!result || G_IS_ASYNC_RESULT(result));
-   g_assert(MONGO_IS_PROTOCOL(protocol));
-
-   priv = protocol->priv;
-
-   /*
-    * Check if succeeded filling buffered input with Mongo reply message.
-    */
-   if (result) {
-      if (!g_buffered_input_stream_fill_finish(input_stream, result, &error)) {
+   if (!(message = mongo_input_stream_read_message_finish(input_stream,
+                                                          result,
+                                                          &error))) {
+      if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
          /*
-          * TODO: Check if this was a cancellation from our finalizer.
+          * This happens if priv->shutdown was cancelled.
           */
-         g_assert_not_reached();
-         GOTO(cleanup);
+         g_error_free(error);
+         EXIT;
       }
+
+      g_assert(MONGO_IS_PROTOCOL(protocol));
+      mongo_protocol_fail(protocol, error);
+      g_error_free(error);
+
+      EXIT;
    }
 
-   buffer = g_buffered_input_stream_peek_buffer(input_stream, &count);
-   g_assert(buffer);
-   g_assert_cmpint(count, >=, 36);
-
-   /*
-    * Make sure we got a reply.
-    */
-   memcpy(&header, buffer, sizeof header);
-   header.msg_len = GUINT32_FROM_LE(header.msg_len);
-   header.request_id = GUINT32_FROM_LE(header.request_id);
-   header.response_to = GUINT32_FROM_LE(header.response_to);
-   header.op_code = GUINT32_FROM_LE(header.op_code);
-   if (header.op_code != MONGO_OPERATION_REPLY) {
-      GOTO(failure);
-   }
-
-   g_input_stream_skip(G_INPUT_STREAM(input_stream),
-                       sizeof header,
-                       NULL,
-                       NULL);
-
-   /*
-    * TODO: If the message size is decently small, we should use alloca()
-    *       to allocate space on the stack instead of the heap. I suspect
-    *       this could be a decent speedup when handling lots of packets.
-    */
-
-   count = 0;
-   reply_buffer = g_malloc(header.msg_len);
-   g_input_stream_read_all(G_INPUT_STREAM(input_stream),
-                           reply_buffer,
-                           header.msg_len - sizeof header,
-                           &count,
-                           NULL,
-                           &error);
-
-   DUMP_BYTES(reply_buffer, reply_buffer, count);
-
-   if (count != (header.msg_len - sizeof header)) {
-      GOTO(failure);
-   }
-
-   reply = g_object_new(MONGO_TYPE_MESSAGE_REPLY,
-                        "request-id", header.request_id,
-                        "response-to", header.response_to,
-                        NULL);
-   if (!mongo_message_load_from_data(MONGO_MESSAGE(reply),
-                                     reply_buffer,
-                                     count)) {
-      g_clear_object(&reply);
-      GOTO(failure);
-   }
-
-   /*
-    * See if there was someone waiting for this request.
-    */
-   if ((request = g_hash_table_lookup(priv->requests,
-                                      GINT_TO_POINTER(header.response_to)))) {
-      g_simple_async_result_set_op_res_gpointer(request, reply, g_object_unref);
-      mongo_simple_async_result_complete_in_idle(request);
-      g_hash_table_remove(priv->requests, GINT_TO_POINTER(header.response_to));
-   }
-
-   /*
-    * Wait for the next message to arrive.
-    */
-   if (g_buffered_input_stream_get_available(input_stream) < 16) {
-      g_buffered_input_stream_fill_async(
-            input_stream,
-            16, /* sizeof MsgHeader */
-            G_PRIORITY_DEFAULT,
-            priv->shutdown,
-            (GAsyncReadyCallback)mongo_protocol_fill_header_cb,
-            g_object_ref(protocol));
-   } else {
-      mongo_protocol_fill_header_cb(input_stream,
-                                    NULL,
-                                    g_object_ref(protocol));
-   }
-
-cleanup:
-   g_object_unref(protocol);
-   g_free(reply_buffer);
-   EXIT;
-
-failure:
-   mongo_protocol_fail(protocol, error);
-   g_object_unref(protocol);
-   g_free(reply_buffer);
-   EXIT;
-}
-
-static void
-mongo_protocol_fill_header_cb (GBufferedInputStream *input_stream,
-                               GAsyncResult         *result,
-                               MongoProtocol        *protocol)
-{
-   MongoProtocolPrivate *priv;
-   const guint8 *buffer;
-   guint32 msg_len;
-   guint32 op_code;
-   GError *error = NULL;
-   gsize count;
-
-   ENTRY;
-
-   g_assert(G_IS_BUFFERED_INPUT_STREAM(input_stream));
-   g_assert(!result || G_IS_ASYNC_RESULT(result));
    g_assert(MONGO_IS_PROTOCOL(protocol));
-
    priv = protocol->priv;
 
-   /*
-    * Check if we succeeded filling buffered input with Mongo reply header.
-    * If result is NULL, then this was done synchronously and we don't need
-    * to worry about finishing an async request.
-    */
-   if (result) {
-      if (!g_buffered_input_stream_fill_finish(input_stream, result, &error)) {
-         mongo_protocol_fail(protocol, NULL);
-         GOTO(cleanup);
-      }
+   g_signal_emit(protocol, gSignals[MESSAGE_READ], 0, message);
+
+   response_to = mongo_message_get_response_to(message);
+   if ((request = g_hash_table_lookup(priv->requests,
+                                      GINT_TO_POINTER(response_to)))) {
+      g_simple_async_result_set_op_res_gpointer(request,
+                                                g_object_ref(message),
+                                                g_object_unref);
+      mongo_simple_async_result_complete_in_idle(request);
+      g_hash_table_remove(priv->requests, GINT_TO_POINTER(response_to));
    }
 
-   /*
-    * Read the message length so that we may wait until that many bytes have
-    * been filled into the buffer.
-    */
-   buffer = g_buffered_input_stream_peek_buffer(input_stream, &count);
+   g_object_unref(message);
 
-   /*
-    * If we got no data back, its because we closed the connection from a
-    * failure scenario.
-    */
-   if (!count) {
-      GOTO(cleanup);
-   }
+   mongo_input_stream_read_message_async(input_stream,
+                                         priv->shutdown,
+                                         mongo_protocol_read_message_cb,
+                                         protocol);
 
-   g_assert_cmpint(count, >=, 16);
-   DUMP_BYTES(buffer, buffer, count);
-
-   /*
-    * Determine the size of incoming message and op_code.
-    */
-   msg_len = GUINT32_FROM_LE(*(const guint32 *)buffer);
-   op_code = GUINT32_FROM_LE(*(const guint32 *)(buffer + 12));
-
-   /*
-    * We only know about MONGO_OPERATION_REPLY from the server. Everything
-    * else is a protocol error.
-    */
-   if (op_code != MONGO_OPERATION_REPLY) {
-      mongo_protocol_fail(protocol, NULL);
-   }
-
-   /*
-    * Wait until the entire message has been received.
-    */
-   if (g_buffered_input_stream_get_available(input_stream) < msg_len) {
-      g_buffered_input_stream_fill_async(
-            input_stream,
-            MAX(36, msg_len),
-            G_PRIORITY_DEFAULT,
-            priv->shutdown,
-            (GAsyncReadyCallback)mongo_protocol_fill_message_cb,
-            g_object_ref(protocol));
-   } else {
-      mongo_protocol_fill_message_cb(input_stream, NULL, protocol);
-   }
-
-cleanup:
-   g_object_unref(protocol);
    EXIT;
 }
 
@@ -1113,7 +968,7 @@ mongo_protocol_set_io_stream (MongoProtocol *protocol,
    priv->io_stream = g_object_ref(io_stream);
 
    input_stream = g_io_stream_get_input_stream(io_stream);
-   priv->input_stream = g_buffered_input_stream_new(input_stream);
+   priv->input_stream = mongo_input_stream_new(input_stream);
 #if 0
    g_buffered_input_stream_set_buffer_size(
          G_BUFFERED_INPUT_STREAM(input_stream),
@@ -1126,13 +981,27 @@ mongo_protocol_set_io_stream (MongoProtocol *protocol,
          G_BUFFERED_OUTPUT_STREAM(priv->output_stream),
          TRUE);
 
-   g_buffered_input_stream_fill_async(
-         G_BUFFERED_INPUT_STREAM(priv->input_stream),
-         16, /* sizeof MsgHeader */
-         G_PRIORITY_DEFAULT,
+   mongo_input_stream_read_message_async(
+         MONGO_INPUT_STREAM(priv->input_stream),
          priv->shutdown,
-         (GAsyncReadyCallback)mongo_protocol_fill_header_cb,
-         g_object_ref(protocol));
+         mongo_protocol_read_message_cb,
+         protocol);
+
+   EXIT;
+}
+
+static void
+mongo_protocol_dispose (GObject *object)
+{
+   MongoProtocolPrivate *priv;
+
+   ENTRY;
+
+   priv = MONGO_PROTOCOL(object)->priv;
+
+   g_cancellable_cancel(priv->shutdown);
+
+   G_OBJECT_CLASS(mongo_protocol_parent_class)->dispose(object);
 
    EXIT;
 }
@@ -1153,6 +1022,8 @@ mongo_protocol_finalize (GObject *object)
       priv->requests = NULL;
       g_hash_table_unref(hash);
    }
+
+   g_printerr("REFCOUNT: %u\n", G_OBJECT(priv->input_stream)->ref_count);
 
    g_clear_object(&priv->shutdown);
    g_clear_object(&priv->input_stream);
@@ -1221,6 +1092,7 @@ mongo_protocol_class_init (MongoProtocolClass *klass)
    ENTRY;
 
    object_class = G_OBJECT_CLASS(klass);
+   object_class->dispose = mongo_protocol_dispose;
    object_class->finalize = mongo_protocol_finalize;
    object_class->get_property = mongo_protocol_get_property;
    object_class->set_property = mongo_protocol_set_property;
@@ -1295,6 +1167,17 @@ mongo_protocol_class_init (MongoProtocolClass *klass)
                                    1,
                                    G_TYPE_ERROR);
 
+   gSignals[MESSAGE_READ] = g_signal_new("message-read",
+                                         MONGO_TYPE_PROTOCOL,
+                                         G_SIGNAL_RUN_FIRST,
+                                         0,
+                                         NULL,
+                                         NULL,
+                                         g_cclosure_marshal_VOID__OBJECT,
+                                         G_TYPE_NONE,
+                                         1,
+                                         MONGO_TYPE_MESSAGE);
+
    EXIT;
 }
 
@@ -1306,7 +1189,7 @@ mongo_protocol_init (MongoProtocol *protocol)
    protocol->priv = G_TYPE_INSTANCE_GET_PRIVATE(protocol,
                                                 MONGO_TYPE_PROTOCOL,
                                                 MongoProtocolPrivate);
-   protocol->priv->last_request_id = g_random_int();
+   protocol->priv->last_request_id = g_random_int_range(0, G_MAXINT32);
    protocol->priv->getlasterror_w = 0;
    protocol->priv->getlasterror_j = TRUE;
    protocol->priv->shutdown = g_cancellable_new();

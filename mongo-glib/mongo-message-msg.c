@@ -66,7 +66,8 @@ mongo_message_msg_load_from_data (MongoMessage *message,
 
    g_assert(MONGO_IS_MESSAGE_MSG(msg));
 
-   if (g_utf8_validate((gchar *)data, length, NULL)) {
+   if (g_utf8_validate((gchar *)data, length - 1, NULL) &&
+       (data[length-1] == '\0')) {
       mongo_message_msg_set_message(msg, (gchar *)data);
       RETURN(TRUE);
    }

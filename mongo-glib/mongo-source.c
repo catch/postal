@@ -19,13 +19,13 @@
 #include "mongo-debug.h"
 #include "mongo-source.h"
 
-typedef struct
+struct _MongoSource
 {
    GSource source;
    GMutex mutex;
    GSList *head;
    GSList *tail;
-} MongoSource;
+};
 
 /*
  * TODO: This currently only allows for completions within the default
@@ -50,6 +50,21 @@ static GSourceFuncs  gMongoSourceFuncs = {
    (gpointer)mongo_source_dispatch,
    (gpointer)mongo_source_finalize,
 };
+
+MongoSource *
+mongo_source_new (void)
+{
+   MongoSource *msource;
+   GSource *source;
+
+   source = g_source_new(&gMongoSourceFuncs, sizeof(MongoSource));
+   msource = (MongoSource *)source;
+   g_source_set_name(source, "MongoSource");
+   g_source_set_priority(source, G_PRIORITY_DEFAULT);
+   g_mutex_init(&msource->mutex);
+
+   return msource;
+}
 
 MongoSource *
 mongo_source_get_source (void)
@@ -127,6 +142,35 @@ mongo_source_finalize (MongoSource *source)
 
    g_slist_foreach(list, (GFunc)g_object_unref, NULL);
    g_slist_free(list);
+
+   EXIT;
+}
+
+void
+mongo_source_complete_in_idle (MongoSource        *source,
+                               GSimpleAsyncResult *simple)
+{
+   GSList *link_;
+
+   ENTRY;
+
+   link_ = g_slist_append(NULL, g_object_ref(simple));
+
+   g_mutex_lock(&source->mutex);
+
+   if (source->tail) {
+      source->tail->next = link_;
+   }
+
+   source->tail = link_;
+
+   if (!source->head) {
+      source->head = link_;
+   }
+
+   g_mutex_unlock(&source->mutex);
+
+   g_main_context_wakeup(g_source_get_context((GSource *)source));
 
    EXIT;
 }

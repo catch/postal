@@ -70,17 +70,19 @@
     G_STMT_START {                                                  \
         GString *str, *astr;                                        \
         gint _i;                                                    \
+        guint8 _v;                                                  \
         g_log(G_LOG_DOMAIN, G_LOG_LEVEL_TRACE,                      \
               "        %s = %p [%d]", #_n, _b, (gint)_l);           \
         str = g_string_sized_new(80);                               \
         astr = g_string_sized_new(16);                              \
         for (_i = 0; _i < _l; _i++) {                               \
+            _v = _b[_i];                                            \
             if ((_i % 16) == 0) {                                   \
                 g_string_append_printf(str, "%06x: ", _i);          \
             }                                                       \
-            g_string_append_printf(str, " %02x", _b[_i]);           \
-            if (g_ascii_isprint(_b[_i])) {                          \
-                g_string_append_printf(astr, " %c", _b[_i]);        \
+            g_string_append_printf(str, " %02x", _v);               \
+            if (g_ascii_isprint(_v)) {                              \
+                g_string_append_printf(astr, " %c", _v);            \
             } else {                                                \
                 g_string_append(astr, " .");                        \
             }                                                       \

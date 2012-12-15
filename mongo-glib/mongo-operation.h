@@ -50,7 +50,9 @@ typedef enum
    MONGO_OPERATION_KILL_CURSORS = 2007,
 } MongoOperation;
 
-GType mongo_operation_get_type (void) G_GNUC_CONST;
+GType    mongo_operation_get_type         (void) G_GNUC_CONST;
+gboolean mongo_operation_is_known         (MongoOperation operation);
+GType    mongo_operation_get_message_type (MongoOperation operation);
 
 G_END_DECLS
 

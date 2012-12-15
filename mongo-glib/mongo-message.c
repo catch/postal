@@ -22,7 +22,7 @@
 #include "mongo-message.h"
 #include "mongo-message-reply.h"
 
-G_DEFINE_ABSTRACT_TYPE(MongoMessage, mongo_message, G_TYPE_INITIALLY_UNOWNED)
+G_DEFINE_ABSTRACT_TYPE(MongoMessage, mongo_message, G_TYPE_OBJECT)
 
 struct _MongoMessagePrivate
 {
@@ -180,6 +180,39 @@ mongo_message_save_to_data (MongoMessage *message,
    RETURN(ret);
 }
 
+GBytes *
+mongo_message_save_to_bytes (MongoMessage  *message,
+                             GError       **error)
+{
+   MongoMessageClass *klass;
+   GBytes *ret;
+   guint8 *buf;
+   gsize buflen;
+
+   ENTRY;
+
+   g_return_val_if_fail(MONGO_IS_MESSAGE(message), NULL);
+
+   klass = MONGO_MESSAGE_GET_CLASS(message);
+
+   if (klass->save_to_bytes) {
+      ret = klass->save_to_bytes(message, error);
+      RETURN(ret);
+   }
+
+   if (!(buf = klass->save_to_data(message, &buflen))) {
+      g_set_error(error,
+                  MONGO_MESSAGE_ERROR,
+                  MONGO_MESSAGE_ERROR_INVALID_MESSAGE,
+                  _("%s instance is invalid."),
+                  g_type_name(G_TYPE_FROM_INSTANCE(message)));
+      RETURN(NULL);
+   }
+
+   ret = g_bytes_new_take(buf, buflen);
+   RETURN(ret);
+}
+
 static void
 mongo_message_finalize (GObject *object)
 {
@@ -283,4 +316,10 @@ mongo_message_init (MongoMessage *message)
       G_TYPE_INSTANCE_GET_PRIVATE(message,
                                   MONGO_TYPE_MESSAGE,
                                   MongoMessagePrivate);
+}
+
+GQuark
+mongo_message_error_quark (void)
+{
+   return g_quark_from_static_string("MongoMessageError");
 }

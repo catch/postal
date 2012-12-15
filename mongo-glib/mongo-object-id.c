@@ -240,7 +240,7 @@ mongo_object_id_to_string_r (const MongoObjectId *object_id,
    g_return_if_fail(object_id);
    g_return_if_fail(string);
 
-   dst = (guint16 *)string;
+   dst = (guint16 *)(gpointer)string;
 
    dst[0] = gHexTable[id[0]];
    dst[1] = gHexTable[id[1]];
@@ -275,7 +275,7 @@ mongo_object_id_to_string (const MongoObjectId *object_id)
    g_return_val_if_fail(object_id, NULL);
 
    str = g_new(gchar, 25);
-   dst = (guint16 *)str;
+   dst = (guint16 *)(gpointer)str;
 
    dst[0] = gHexTable[id[0]];
    dst[1] = gHexTable[id[1]];
