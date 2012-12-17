@@ -60,7 +60,7 @@ test1 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices", gAccount);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -129,7 +129,7 @@ test2 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u",
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices/%064u",
                          gAccount, gC2dmDeviceId);
    message = soup_message_new("PUT", url);
    g_assert(SOUP_IS_MESSAGE(message));
@@ -216,7 +216,7 @@ test3 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices", gAccount);
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices", gAccount);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -285,7 +285,7 @@ test4 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("GET", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -357,7 +357,7 @@ test5 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("PUT", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
@@ -403,7 +403,7 @@ test6 (void)
    session = soup_session_async_new();
    g_assert(SOUP_IS_SESSION(session));
 
-   url = g_strdup_printf("http://localhost:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
+   url = g_strdup_printf("http://127.0.0.1:6616/v1/users/%s/devices/%064u", gAccount, gC2dmDeviceId);
    message = soup_message_new("DELETE", url);
    g_assert(SOUP_IS_MESSAGE(message));
    g_free(url);
