@@ -90,8 +90,6 @@ postal_service_add_device_cb (GObject      *object,
 
       bson = list->data;
 
-      g_printerr("%s\n\n\n\n", mongo_bson_to_string(bson, FALSE));
-
       if (mongo_bson_iter_init_find(&iter, bson, "lastErrorObject") &&
           MONGO_BSON_ITER_HOLDS_DOCUMENT(&iter) &&
           mongo_bson_iter_recurse(&iter, &citer) &&
