@@ -28,6 +28,7 @@ stamp-h1
 postal-add-device
 postal-remove-device
 test-postal-device
+test-postal-dm-cache
 test-postal-http
 test-postal-service
 test-url-router
