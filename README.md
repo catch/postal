@@ -63,3 +63,29 @@ make install
 ## REST API
 
  * TODO: Describe REST API.
+
+### Add Device
+
+```sh
+$ cat device.json
+{
+  "device_type": "aps",
+  "device_token": "1212121212121212121212121212121212121212121212121212121212121212",
+  "user": "012345678901234567890123"
+}
+$ curl -i -X PUT http://localhost:5300/v1/users/012345678901234567890123/devices/1212121212121212121212121212121212121212121212121212121212121212 --data-binary @device.json
+HTTP/1.1 201 Created
+Server: Postal/0.1.0
+Date: Tue, 18 Dec 2012 02:46:33 GMT
+Location: /v1/users/012345678901234567890123/devices/1212121212121212121212121212121212121212121212121212121212121212
+Content-Type: application/json
+Content-Length: 217
+
+{
+  "device_token" : "1212121212121212121212121212121212121212121212121212121212121212",
+  "device_type" : "aps",
+  "user" : "012345678901234567890123",
+  "created_at" : "2012-12-18T02:46:33Z",
+  "removed_at" : null
+}
+```
