@@ -89,3 +89,14 @@ Content-Length: 217
   "removed_at" : null
 }
 ```
+
+### Remove Device
+
+```sh
+$ curl -i -X DELETE http://localhost:5300/v1/users/012345678901234567890123/devices/1212121212121212121212121212121212121212121212121212121212121212
+HTTP/1.1 204 No Content
+Server: Postal/0.1.0
+Date: Tue, 18 Dec 2012 02:49:21 GMT
+Content-Type: application/json
+Content-Length: 0
+```
