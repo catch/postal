@@ -68,6 +68,7 @@ neo_logger_daily_rotate (NeoLoggerDaily *daily,
    }
 
    g_free(filename);
+   g_free(date);
 
    if (priv->channel) {
       g_io_channel_unref(priv->channel);
