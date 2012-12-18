@@ -26,6 +26,7 @@ postald
 stamp-h1
 *.swp
 postal-add-device
+postal-remove-device
 test-postal-device
 test-postal-http
 test-postal-service
