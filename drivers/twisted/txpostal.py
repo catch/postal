@@ -55,11 +55,15 @@ class Service(service.Service):
         Returns: L{defer.Deferred}
         """
         assert isinstance(device, types.DictType)
-        url = self.urlBase + ('/v1/users/%s/devices' % str(user))
+        url = '/'.join([self.urlBase,
+                        'v1/users',
+                        str(user),
+                        'devices',
+                        str(device['device_token'])])
         postdata = json.dumps(device)
         headers = {'Content-Type': 'application/json'}
         df = client.getPage(url,
-                            method='POST',
+                            method='PUT',
                             postdata=postdata,
                             agent='txpostal',
                             timeout=60,
@@ -67,21 +71,26 @@ class Service(service.Service):
         df.addCallback(lambda d: json.loads(d))
         return df
 
-    def removeDevice(self, user, device_id):
+    def removeDevice(self, user, device_or_token):
         """
         Asynchronously remove a device in Postal.
 
         @param user: a stringable value representing the user id.
         @type user: C{basestring}
 
-        @param device_id: a string containing the device id.
-        @type device: C{basestring}
+        @param device_or_token: a string containing the device id.
+        @type device_or_token: C{basestring}
         """
+        if isinstance(device_or_token, dict):
+            device_or_token = device_or_token.get('device_token')
         assert isinstance(user, basestring)
-        assert isinstance(device_id, basestring)
+        assert isinstance(device_or_token, basestring)
         user = user.encode('ascii')
-        device_id = device_id.encode('ascii')
-        url = '%s/v1/users/%s/devices/%s' % (self.urlBase, user, device_id)
+        url = '/'.join([self.urlBase,
+                        'v1/users',
+                        str(user),
+                        'devices',
+                        str(device_or_token)])
         def onErrback(failure):
             if failure.value.status == '204':
                 return None
@@ -90,22 +99,26 @@ class Service(service.Service):
         df.addErrback(onErrback)
         return df
 
-    def getDevice(self, user, device_id):
+    def getDevice(self, user, device_token):
         """
         Asynchronously fetch a device from Postal.
 
         @param user: a stringable value representing the user id.
         @type user: C{basestring}
 
-        @param device_id: a stringable value representing the device.
+        @param device_token: a stringable value representing the device.
         @type user: C{basestring}
 
         Returns: L{defer.Deferred} to a dict of the device.
         """
         assert isinstance(user, basestring)
         user = user.encode('utf-8')
-        device_id = device_id.encode('utf-8')
-        url = '%s/v1/users/%s/devices/%s' % (self.urlBase, user, device_id)
+        device_token = device_token.encode('utf-8')
+        url = '/'.join([self.urlBase,
+                        'v1/users',
+                        str(user),
+                        'devices',
+                        str(device_token)])
         headers = {'Accept': 'application/json'}
         df = client.getPage(url,
                             method='GET',
@@ -149,10 +162,11 @@ if __name__ == '__main__':
         return r
     df = svc.addDevice(user, device)
     df.addBoth(p)
-    df.addCallback(lambda d: svc.removeDevice(user, d['_id']))
+    df.addCallback(lambda d: svc.removeDevice(user, d['device_token']))
     df.addBoth(p)
     df.addCallback(lambda d: svc.getDevices(user))
     df.addBoth(p)
-    df.addCallback(lambda d: svc.getDevice(user, d[0]['_id']))
+    df.addCallback(lambda d: svc.getDevice(user, d[0]['device_token']))
     df.addBoth(p)
+    df.addBoth(lambda *_: reactor.stop())
     reactor.run()
