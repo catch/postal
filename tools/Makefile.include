@@ -1,0 +1,15 @@
+bin_PROGRAMS += postal-add-device
+
+postal_add_device_SOURCES =
+postal_add_device_SOURCES += tools/postal-add-device.c
+
+postal_add_device_CPPFLAGS =
+postal_add_device_CPPFLAGS += $(JSON_CFLAGS)
+postal_add_device_CPPFLAGS += $(SOUP_CFLAGS)
+postal_add_device_CPPFLAGS += -I$(top_srcdir)
+postal_add_device_CPPFLAGS += -I$(top_srcdir)/mongo-glib
+
+postal_add_device_LDADD =
+postal_add_device_LDADD += $(JSON_LIBS)
+postal_add_device_LDADD += $(SOUP_LIBS)
+postal_add_device_LDADD += libpostal.la

@@ -8,6 +8,7 @@ include postal/Makefile.include
 include push-glib/Makefile.include
 include redis-glib/Makefile.include
 include tests/Makefile.include
+include tools/Makefile.include
 
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 DISTCHECK_CONFIGURE_FLAGS = --enable-silent-rules --enable-debug=yes

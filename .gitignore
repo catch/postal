@@ -25,6 +25,7 @@ missing
 postald
 stamp-h1
 *.swp
+postal-add-device
 test-postal-device
 test-postal-http
 test-postal-service
