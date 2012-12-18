@@ -158,13 +158,15 @@ postal_dm_cache_ref (PostalDmCache *cache)
 void
 postal_dm_cache_unref (PostalDmCache *cache)
 {
+   guint i;
+
    g_return_if_fail(cache);
    g_return_if_fail(cache->ref_count > 0);
 
    if (g_atomic_int_dec_and_test(&cache->ref_count)) {
-      /*
-       * TODO: Free all the remaining items.
-       */
+      for (i = 0; i < cache->size; i++) {
+         cache->free_func(cache->data[i]);
+      }
       g_free(cache);
    }
 }
