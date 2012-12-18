@@ -89,6 +89,27 @@ postal_dm_cache_insert (PostalDmCache *cache,
 }
 
 /**
+ * postal_dm_cache_remove_all:
+ * @cache: A #PostalDmCache.
+ *
+ * Removes all items from @cache.
+ */
+void
+postal_dm_cache_remove_all (PostalDmCache *cache)
+{
+   guint i;
+
+   g_return_if_fail(cache);
+
+   for (i = 0; i < cache->size; i++) {
+      if (cache->data[i]) {
+         cache->free_func(cache->data[i]);
+         cache->data[i] = NULL;
+      }
+   }
+}
+
+/**
  * postal_dm_cache_new:
  * @size: The number of entries in the cache table.
  * @hash_func: A #GHashFunc to hash keys.
@@ -158,15 +179,11 @@ postal_dm_cache_ref (PostalDmCache *cache)
 void
 postal_dm_cache_unref (PostalDmCache *cache)
 {
-   guint i;
-
    g_return_if_fail(cache);
    g_return_if_fail(cache->ref_count > 0);
 
    if (g_atomic_int_dec_and_test(&cache->ref_count)) {
-      for (i = 0; i < cache->size; i++) {
-         cache->free_func(cache->data[i]);
-      }
+      postal_dm_cache_remove_all(cache);
       g_free(cache);
    }
 }

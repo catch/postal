@@ -25,17 +25,18 @@ G_BEGIN_DECLS
 
 typedef struct _PostalDmCache PostalDmCache;
 
-gboolean       postal_dm_cache_contains (PostalDmCache  *cache,
-                                         gconstpointer   key);
-GType          postal_dm_cache_get_type (void) G_GNUC_CONST;
-gboolean       postal_dm_cache_insert   (PostalDmCache  *cache,
-                                         gpointer        key);
-PostalDmCache *postal_dm_cache_new      (guint           size,
-                                         GHashFunc       hash_func,
-                                         GEqualFunc      equal_func,
-                                         GDestroyNotify  free_func);
-PostalDmCache *postal_dm_cache_ref      (PostalDmCache  *cache);
-void           postal_dm_cache_unref    (PostalDmCache  *cache);
+gboolean       postal_dm_cache_contains   (PostalDmCache  *cache,
+                                           gconstpointer   key);
+GType          postal_dm_cache_get_type   (void) G_GNUC_CONST;
+gboolean       postal_dm_cache_insert     (PostalDmCache  *cache,
+                                           gpointer        key);
+PostalDmCache *postal_dm_cache_new        (guint           size,
+                                           GHashFunc       hash_func,
+                                           GEqualFunc      equal_func,
+                                           GDestroyNotify  free_func);
+PostalDmCache *postal_dm_cache_ref        (PostalDmCache  *cache);
+void           postal_dm_cache_remove_all (PostalDmCache  *cache);
+void           postal_dm_cache_unref      (PostalDmCache  *cache);
 
 G_END_DECLS
 
