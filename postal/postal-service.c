@@ -24,22 +24,33 @@
 #include <push-glib.h>
 
 #include "postal-debug.h"
+#include "postal-dm-cache.h"
 #include "postal-metrics.h"
 #include "postal-service.h"
+
+#ifndef POSTAL_SERVICE_DM_CACHES
+#define POSTAL_SERVICE_DM_CACHES 20
+#endif
+
+#ifndef POSTAL_SERVICE_DM_CACHE_ENTRIES
+#define POSTAL_SERVICE_DM_CACHE_ENTRIES 16384
+#endif
 
 G_DEFINE_TYPE(PostalService, postal_service, NEO_TYPE_SERVICE_BASE)
 
 struct _PostalServicePrivate
 {
-   PushApsClient   *aps;
-   PushC2dmClient  *c2dm;
-   PushGcmClient   *gcm;
-   gchar           *db_and_collection;
-   gchar           *db_and_cmd;
-   gchar           *db;
-   gchar           *collection;
-   PostalMetrics   *metrics;
-   MongoConnection *mongo;
+   PushApsClient    *aps;
+   PushC2dmClient   *c2dm;
+   PushGcmClient    *gcm;
+   gchar            *db_and_collection;
+   gchar            *db_and_cmd;
+   gchar            *db;
+   gchar            *collection;
+   PostalMetrics    *metrics;
+   MongoConnection  *mongo;
+   PostalDmCache   **caches;
+   guint             n_caches;
 };
 
 PostalService *
@@ -1548,6 +1559,7 @@ static void
 postal_service_finalize (GObject *object)
 {
    PostalServicePrivate *priv;
+   guint i;
 
    ENTRY;
 
@@ -1562,6 +1574,16 @@ postal_service_finalize (GObject *object)
    g_free(priv->collection);
    g_free(priv->db_and_cmd);
    g_free(priv->db_and_collection);
+
+   for (i = 0; i < priv->n_caches; i++) {
+      postal_dm_cache_unref(priv->caches[i]);
+      priv->caches[i] = NULL;
+   }
+
+   g_free(priv->caches);
+
+   priv->n_caches = 0;
+   priv->caches = NULL;
 
    G_OBJECT_CLASS(postal_service_parent_class)->finalize(object);
 
@@ -1589,6 +1611,8 @@ postal_service_class_init (PostalServiceClass *klass)
 static void
 postal_service_init (PostalService *service)
 {
+   guint i;
+
    ENTRY;
 
    service->priv = G_TYPE_INSTANCE_GET_PRIVATE(service,
@@ -1598,6 +1622,16 @@ postal_service_init (PostalService *service)
    service->priv->db_and_collection = g_strdup("test.devices");
    service->priv->db = g_strdup("test");
    service->priv->collection = g_strdup("devices");
+
+   service->priv->n_caches = POSTAL_SERVICE_DM_CACHES;
+   service->priv->caches = g_new0(PostalDmCache*, service->priv->n_caches);
+   for (i = 0; i < service->priv->n_caches; i++) {
+      service->priv->caches[i] =
+         postal_dm_cache_new(POSTAL_SERVICE_DM_CACHE_ENTRIES,
+                             g_str_hash,
+                             g_str_equal,
+                             g_free);
+   }
 
    EXIT;
 }
