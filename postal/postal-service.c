@@ -61,6 +61,71 @@ postal_service_new (void)
                        NULL);
 }
 
+static gboolean
+postal_service_should_ignore (PostalService      *service,
+                              PostalDevice       *device,
+                              PostalNotification *notif)
+{
+   PostalServicePrivate *priv;
+   gboolean ret;
+   guint i;
+   guint idx;
+   guint oldest;
+   gchar *key;
+
+   ENTRY;
+
+   g_return_val_if_fail(POSTAL_IS_SERVICE(service), FALSE);
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), FALSE);
+   g_return_val_if_fail(POSTAL_IS_NOTIFICATION(notif), FALSE);
+
+   priv = service->priv;
+
+   /*
+    * TODO: Some of this could be optimized fairly easily. Like doing the
+    *       hash once and performing a lookup using that.
+    *       Additionally, the call to g_get_monotonic_time() for each
+    *       message that is getting checked. Perhaps we could have an
+    *       input parameter for that.
+    */
+
+   /*
+    * Build our collapse key for this device:message pair.
+    */
+   key = g_strdup_printf("%s:%s",
+                         postal_device_get_device_token(device),
+                         postal_notification_get_collapse_key(notif));
+
+   /*
+    * Figure out the bucket for our active cache.
+    */
+   idx = g_get_monotonic_time() / G_USEC_PER_SEC / priv->n_caches;
+   oldest = (idx + 1) % priv->n_caches;
+
+   /*
+    * Cleanup the oldest cache.
+    */
+   if (!postal_dm_cache_is_empty(priv->caches[oldest])) {
+      postal_dm_cache_remove_all(priv->caches[oldest]);
+   }
+
+   /*
+    * See if any of the recent caches have this item.
+    */
+   for (i = 0; i < priv->n_caches; i++) {
+      if ((ret = postal_dm_cache_contains(priv->caches[i], key))) {
+         g_free(key);
+         RETURN(TRUE);
+      }
+   }
+
+   /*
+    * Insert the key into the current cache.
+    */
+   ret = postal_dm_cache_insert(priv->caches[idx], key);
+   RETURN(ret);
+}
+
 static void
 postal_service_add_device_cb (GObject      *object,
                               GAsyncResult *result,
@@ -992,6 +1057,7 @@ postal_service_notify_cb (GObject      *object,
    MongoConnection *connection = (MongoConnection *)object;
    PushApsIdentity *aps;
    PushApsMessage *aps_message;
+   PostalService *service;
    PostalDevice *device;
    const gchar *device_token;
    GObject *source;
@@ -1005,7 +1071,8 @@ postal_service_notify_cb (GObject      *object,
    g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
 
    source = g_async_result_get_source_object(user_data);
-   priv = POSTAL_SERVICE(source)->priv;
+   service = POSTAL_SERVICE(source);
+   priv = service->priv;
    g_object_unref(source);
 
    if (!(reply = mongo_connection_query_finish(connection, result, &error))) {
@@ -1053,41 +1120,49 @@ postal_service_notify_cb (GObject      *object,
          continue;
       }
 
-      switch (device_type) {
-      case POSTAL_DEVICE_APS:
-         gcm = push_gcm_identity_new(device_token);
-         gcm_devices = g_list_append(gcm_devices, gcm);
-         postal_metrics_device_notified(priv->metrics, device);
-         break;
-      case POSTAL_DEVICE_C2DM:
-         c2dm = g_object_new(PUSH_TYPE_C2DM_IDENTITY,
-                             "registration-id", device_token,
-                             NULL);
-         push_c2dm_client_deliver_async(priv->c2dm,
-                                        c2dm,
-                                        c2dm_message,
-                                        NULL, /* TODO: */
-                                        postal_service_notify_c2dm_cb,
-                                        NULL);
-         postal_metrics_device_notified(priv->metrics, device);
-         g_object_unref(c2dm);
-         break;
-      case POSTAL_DEVICE_GCM:
-         aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
-                            "device-token", device_token,
-                            NULL);
-         push_aps_client_deliver_async(priv->aps,
-                                       aps,
-                                       aps_message,
-                                       NULL, /* TODO: */
-                                       postal_service_notify_aps_cb,
-                                       NULL);
-         postal_metrics_device_notified(priv->metrics, device);
-         g_object_unref(aps);
-         break;
-      default:
-         g_assert_not_reached();
-         break;
+      /*
+       * See if we can ignore this message.
+       */
+      if (!postal_service_should_ignore(service, device, notif)) {
+         /*
+          * Build the provider specific message.
+          */
+         switch (device_type) {
+         case POSTAL_DEVICE_APS:
+            gcm = push_gcm_identity_new(device_token);
+            gcm_devices = g_list_append(gcm_devices, gcm);
+            postal_metrics_device_notified(priv->metrics, device);
+            break;
+         case POSTAL_DEVICE_C2DM:
+            c2dm = g_object_new(PUSH_TYPE_C2DM_IDENTITY,
+                                "registration-id", device_token,
+                                NULL);
+            push_c2dm_client_deliver_async(priv->c2dm,
+                                           c2dm,
+                                           c2dm_message,
+                                           NULL, /* TODO: */
+                                           postal_service_notify_c2dm_cb,
+                                           NULL);
+            postal_metrics_device_notified(priv->metrics, device);
+            g_object_unref(c2dm);
+            break;
+         case POSTAL_DEVICE_GCM:
+            aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
+                               "device-token", device_token,
+                               NULL);
+            push_aps_client_deliver_async(priv->aps,
+                                          aps,
+                                          aps_message,
+                                          NULL, /* TODO: */
+                                          postal_service_notify_aps_cb,
+                                          NULL);
+            postal_metrics_device_notified(priv->metrics, device);
+            g_object_unref(aps);
+            break;
+         default:
+            g_assert_not_reached();
+            break;
+         }
       }
 
       g_object_unref(device);
