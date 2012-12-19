@@ -1,4 +1,5 @@
 bin_PROGRAMS += postal-add-device
+bin_PROGRAMS += postal-get-devices
 bin_PROGRAMS += postal-remove-device
 
 
@@ -15,6 +16,21 @@ postal_add_device_LDADD =
 postal_add_device_LDADD += $(JSON_LIBS)
 postal_add_device_LDADD += $(SOUP_LIBS)
 postal_add_device_LDADD += libpostal.la
+
+
+postal_get_devices_SOURCES =
+postal_get_devices_SOURCES += tools/postal-get-devices.c
+
+postal_get_devices_CPPFLAGS =
+postal_get_devices_CPPFLAGS += $(JSON_CFLAGS)
+postal_get_devices_CPPFLAGS += $(SOUP_CFLAGS)
+postal_get_devices_CPPFLAGS += -I$(top_srcdir)
+postal_get_devices_CPPFLAGS += -I$(top_srcdir)/mongo-glib
+
+postal_get_devices_LDADD =
+postal_get_devices_LDADD += $(JSON_LIBS)
+postal_get_devices_LDADD += $(SOUP_LIBS)
+postal_get_devices_LDADD += libpostal.la
 
 
 postal_remove_device_SOURCES =
