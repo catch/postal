@@ -31,12 +31,23 @@ test1 (void)
                                g_str_hash,
                                g_str_equal,
                                g_free);
+   g_assert(postal_dm_cache_is_empty(cache));
 
    for (i = 0; i < G_N_ELEMENTS(gTest1Data); i++) {
       data = &gTest1Data[i];
       g_assert(data->key);
       g_assert_cmpint(data->expected, ==, postal_dm_cache_contains(cache, data->key));
       g_assert_cmpint(data->expected, ==, postal_dm_cache_insert(cache, g_strdup(data->key)));
+   }
+
+   g_assert(!postal_dm_cache_is_empty(cache));
+   postal_dm_cache_remove_all(cache);
+   g_assert(postal_dm_cache_is_empty(cache));
+
+   for (i = 0; i < G_N_ELEMENTS(gTest1Data); i++) {
+      data = &gTest1Data[i];
+      g_assert(data->key);
+      g_assert_cmpint(FALSE, ==, postal_dm_cache_contains(cache, data->key));
    }
 
    postal_dm_cache_unref(cache);

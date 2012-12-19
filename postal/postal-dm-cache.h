@@ -30,6 +30,7 @@ gboolean       postal_dm_cache_contains   (PostalDmCache  *cache,
 GType          postal_dm_cache_get_type   (void) G_GNUC_CONST;
 gboolean       postal_dm_cache_insert     (PostalDmCache  *cache,
                                            gpointer        key);
+gboolean       postal_dm_cache_is_empty   (PostalDmCache  *cache);
 PostalDmCache *postal_dm_cache_new        (guint           size,
                                            GHashFunc       hash_func,
                                            GEqualFunc      equal_func,

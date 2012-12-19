@@ -25,8 +25,24 @@ struct _PostalDmCache
    GHashFunc      hash_func;
    GEqualFunc     equal_func;
    GDestroyNotify free_func;
+   gboolean       empty;
    gpointer       data[0];
 };
+
+/**
+ * postal_dm_cache_is_empty:
+ * @cache: A #PostalDmCache.
+ *
+ * Checks if the cache has had any items added.
+ *
+ * Returns: %TRUE if @cache is empty.
+ */
+gboolean
+postal_dm_cache_is_empty (PostalDmCache *cache)
+{
+   g_return_val_if_fail(cache, FALSE);
+   return cache->empty;
+}
 
 /**
  * postal_dm_cache_contains:
@@ -84,6 +100,7 @@ postal_dm_cache_insert (PostalDmCache *cache,
       cache->free_func(prev);
    }
    cache->data[idx] = key;
+   cache->empty = FALSE;
 
    return ret;
 }
@@ -107,6 +124,8 @@ postal_dm_cache_remove_all (PostalDmCache *cache)
          cache->data[i] = NULL;
       }
    }
+
+   cache->empty = TRUE;
 }
 
 /**
@@ -148,6 +167,7 @@ postal_dm_cache_new (guint          size,
    cache->hash_func = hash_func;
    cache->equal_func = equal_func;
    cache->free_func = free_func;
+   cache->empty = TRUE;
 
    return cache;
 }
