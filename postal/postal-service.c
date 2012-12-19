@@ -36,6 +36,10 @@
 #define POSTAL_SERVICE_DM_CACHE_ENTRIES 16384
 #endif
 
+#ifndef POSTAL_SERVICE_BUCKET_SIZE_SEC
+#define POSTAL_SERVICE_BUCKET_SIZE_SEC 10
+#endif
+
 G_DEFINE_TYPE(PostalService, postal_service, NEO_TYPE_SERVICE_BASE)
 
 struct _PostalServicePrivate
@@ -99,7 +103,7 @@ postal_service_should_ignore (PostalService      *service,
    /*
     * Figure out the bucket for our active cache.
     */
-   idx = g_get_monotonic_time() / G_USEC_PER_SEC / priv->n_caches;
+   idx = (g_get_monotonic_time() / G_USEC_PER_SEC / POSTAL_SERVICE_BUCKET_SIZE_SEC) % priv->n_caches;
    oldest = (idx + 1) % priv->n_caches;
 
    /*
