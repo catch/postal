@@ -109,6 +109,9 @@ test1 (void)
    PostalService *service;
    PostalDevice *device;
    GKeyFile *key_file;
+   guint64 added;
+   guint64 removed;
+   guint64 updated;
    gchar *rand_str;
 
    gSuccess = FALSE;
@@ -130,6 +133,14 @@ test1 (void)
    neo_service_start(NEO_SERVICE(gApp), NULL);
    postal_service_add_device(service, device, NULL, test1_cb, device);
    g_main_loop_run(gMainLoop);
+   g_object_get(neo_service_get_peer(NEO_SERVICE(service), "metrics"),
+                "devices-added", &added,
+                "devices-removed", &removed,
+                "devices-updated", &updated,
+                NULL);
+   g_assert_cmpint(added, ==, 1);
+   g_assert_cmpint(removed, ==, 1);
+   g_assert_cmpint(updated, ==, 1);
    g_object_unref(device);
    g_assert(gSuccess);
 }
