@@ -608,6 +608,7 @@ postal_http_handle_v1_notify (UrlRouter         *router,
                               gpointer           user_data)
 {
    PostalNotification *notif;
+   const gchar *collapse_key = NULL;
    const gchar *str;
    PostalHttp *http = user_data;
    JsonObject *aps;
@@ -672,9 +673,16 @@ postal_http_handle_v1_notify (UrlRouter         *router,
       return;
    }
 
+   if (json_object_has_member(object, "collapse_key") &&
+       (node = json_object_get_member(object, "collapse_key")) &&
+       JSON_NODE_HOLDS_VALUE(node)) {
+      collapse_key = json_node_get_string(node);
+   }
+
    notif = g_object_new(POSTAL_TYPE_NOTIFICATION,
                         "aps", aps,
                         "c2dm", c2dm,
+                        "collapse-key", collapse_key,
                         "gcm", gcm,
                         NULL);
 
