@@ -1089,20 +1089,6 @@ postal_service_notify_cb (GObject      *object,
    c2dm_message = postal_service_build_c2dm(notif);
    gcm_message = postal_service_build_gcm(notif);
 
-   /*
-    * TODO: Right now, this is just sending a message to all of these users.
-    *       It would be nice if we could add a little delay so we can collapse
-    *       multiple messages into one.
-    *
-    *       The trivial way to do this would be to keep track per user what
-    *       they have and only send one. However, that would introduce delay
-    *       and require more memory.
-    *
-    *       I think we can simply keep the device+collapse_key and ignore
-    *       sending the second if the first was sent within the last 10
-    *       seconds or so. (Then evict that message).
-    */
-
    list = mongo_message_reply_get_documents(reply);
    for (; list; list = list->next) {
       /*
