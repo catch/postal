@@ -18,6 +18,21 @@
 
 #include "postal-dm-cache.h"
 
+/**
+ * SECTION:postal-dm-cache
+ * @title: PostalDmCache
+ * @short_description: Direct-mapped cache
+ *
+ * #PostalDmCache is a cache that will tell you if something exists
+ * within the cache with no false-positives. This is the opposite of a
+ * bloom filter.
+ *
+ * It is important that you have enough space in your cache to reduce the
+ * number of collisions that can occur. Your hash function is also critical
+ * for good distribution of entries. The better your hash function, the less
+ * chance of a false-negative.
+ */
+
 struct _PostalDmCache
 {
    gint           ref_count;
