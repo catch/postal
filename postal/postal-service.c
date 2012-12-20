@@ -1111,7 +1111,10 @@ postal_service_notify_cb (GObject      *object,
       }
 
       /*
-       * See if we can ignore this message.
+       * See if we can ignore this message. This can happen if we have a
+       * matching collapse_key:device token in the array of direct-mapped
+       * caches. We only send the first message matching that pair (unless
+       * it has been evicted from cache).
        */
       if (!postal_service_should_ignore(service, device, notif)) {
          /*
