@@ -137,10 +137,11 @@ push_gcm_client_deliver_cb (SoupSession *session,
        */
       break;
    case SOUP_STATUS_UNAUTHORIZED:
-      g_simple_async_result_set_error(simple,
-                                      SOUP_HTTP_ERROR,
-                                      message->status_code,
-                                      _("GCM request unauthorized."));
+      g_simple_async_result_set_error(
+         simple,
+         SOUP_HTTP_ERROR,
+         message->status_code,
+         _("GCM request unauthorized. Check credentials."));
       GOTO(failure);
    default:
       if (SOUP_STATUS_IS_SERVER_ERROR(message->status_code) &&
