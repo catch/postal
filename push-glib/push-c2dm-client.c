@@ -130,6 +130,15 @@ push_c2dm_client_message_cb (SoupSession *session,
    buffer = soup_message_body_flatten(message->response_body);
    soup_buffer_get_data(buffer, &data, &length);
 
+   if (message->status_code == SOUP_STATUS_UNAUTHORIZED) {
+      g_simple_async_result_set_error(
+         simple,
+         PUSH_C2DM_CLIENT_ERROR,
+         PUSH_C2DM_CLIENT_ERROR_UNAUTHORIZED,
+         _("C2DM request unauthorized. Check credentials."));
+      GOTO(failure);
+   }
+
    if (!g_utf8_validate((gchar *)data, length, NULL)) {
       g_simple_async_result_set_error(simple,
                                       PUSH_C2DM_CLIENT_ERROR,
