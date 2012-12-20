@@ -1119,9 +1119,17 @@ postal_service_notify_cb (GObject      *object,
           */
          switch (device_type) {
          case POSTAL_DEVICE_APS:
-            gcm = push_gcm_identity_new(device_token);
-            gcm_devices = g_list_append(gcm_devices, gcm);
+            aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
+                               "device-token", device_token,
+                               NULL);
+            push_aps_client_deliver_async(priv->aps,
+                                          aps,
+                                          aps_message,
+                                          NULL, /* TODO: */
+                                          postal_service_notify_aps_cb,
+                                          NULL);
             postal_metrics_device_notified(priv->metrics, device);
+            g_object_unref(aps);
             break;
          case POSTAL_DEVICE_C2DM:
             c2dm = g_object_new(PUSH_TYPE_C2DM_IDENTITY,
@@ -1137,17 +1145,9 @@ postal_service_notify_cb (GObject      *object,
             g_object_unref(c2dm);
             break;
          case POSTAL_DEVICE_GCM:
-            aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
-                               "device-token", device_token,
-                               NULL);
-            push_aps_client_deliver_async(priv->aps,
-                                          aps,
-                                          aps_message,
-                                          NULL, /* TODO: */
-                                          postal_service_notify_aps_cb,
-                                          NULL);
+            gcm = push_gcm_identity_new(device_token);
+            gcm_devices = g_list_append(gcm_devices, gcm);
             postal_metrics_device_notified(priv->metrics, device);
-            g_object_unref(aps);
             break;
          default:
             g_assert_not_reached();
