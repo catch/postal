@@ -97,8 +97,7 @@ void           postal_service_set_config           (PostalService        *servic
 void           postal_service_notify               (PostalService        *service,
                                                     PostalNotification   *notification,
                                                     gchar               **users,
-                                                    MongoObjectId       **devices,
-                                                    gsize                 n_devices,
+                                                    gchar               **device_tokens,
                                                     GCancellable         *cancellable,
                                                     GAsyncReadyCallback   callback,
                                                     gpointer              user_data);

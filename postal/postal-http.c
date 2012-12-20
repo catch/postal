@@ -608,7 +608,6 @@ postal_http_handle_v1_notify (UrlRouter         *router,
                               gpointer           user_data)
 {
    PostalNotification *notif;
-   MongoObjectId *oid;
    const gchar *str;
    PostalHttp *http = user_data;
    JsonObject *aps;
@@ -692,21 +691,20 @@ postal_http_handle_v1_notify (UrlRouter         *router,
 
    count = json_array_get_length(devices);
    devices_ptr = g_ptr_array_sized_new(count);
-   g_ptr_array_set_free_func(devices_ptr, (GDestroyNotify)mongo_object_id_free);
+   g_ptr_array_set_free_func(devices_ptr, g_free);
    for (i = 0; i < count; i++) {
       node = json_array_get_element(devices, i);
       if (json_node_get_value_type(node) == G_TYPE_STRING) {
          str = json_node_get_string(node);
-         oid = mongo_object_id_new_from_string(str);
-         g_ptr_array_add(devices_ptr, oid);
+         g_ptr_array_add(devices_ptr, g_strdup(str));
       }
    }
+   g_ptr_array_add(devices_ptr, NULL);
 
    postal_service_notify(http->priv->service,
                          notif,
                          (gchar **)users_ptr->pdata,
-                         (MongoObjectId **)devices_ptr->pdata,
-                         devices_ptr->len,
+                         (gchar **)devices_ptr->pdata,
                          NULL, /* TODO: Cancellable/Timeout? */
                          postal_http_notify_cb,
                          g_object_ref(message));

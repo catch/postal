@@ -1200,8 +1200,7 @@ void
 postal_service_notify (PostalService        *service,
                        PostalNotification   *notification,
                        gchar               **users,
-                       MongoObjectId       **devices,
-                       gsize                 n_devices,
+                       gchar               **device_tokens,
                        GCancellable         *cancellable,
                        GAsyncReadyCallback   callback,
                        gpointer              user_data)
@@ -1229,10 +1228,10 @@ postal_service_notify (PostalService        *service,
    q = mongo_bson_new_empty();
    ar = mongo_bson_new_empty();
 
-   for (i = 0; i < n_devices; i++) {
+   for (i = 0; device_tokens[i]; i++) {
       g_snprintf(idxstr, sizeof idxstr, "%u", i);
       idxstr[sizeof idxstr - 1] = '\0';
-      mongo_bson_append_object_id(ar, idxstr, devices[i]);
+      mongo_bson_append_string(ar, idxstr, device_tokens[i]);
    }
 
    in = mongo_bson_new_empty();
