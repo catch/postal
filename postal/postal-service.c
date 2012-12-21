@@ -1526,6 +1526,13 @@ postal_service_gcm_identity_removed (PostalService   *service,
    EXIT;
 }
 
+static void
+postal_service_mongo_connected (MongoConnection *connection,
+                                gpointer         user_data)
+{
+   g_message("Connection to MongoDB established.");
+}
+
 /**
  * postal_service_start:
  * @service: A #PostalService.
@@ -1607,7 +1614,13 @@ postal_service_start (NeoServiceBase *base,
    priv->gcm = g_object_new(PUSH_TYPE_GCM_CLIENT,
                             "auth-token", gcm_auth_token,
                             NULL);
+
+   g_message("MongoDB server is at %s", uri);
    priv->mongo = mongo_connection_new_from_uri(uri);
+   g_signal_connect(priv->mongo,
+                    "connected",
+                    G_CALLBACK(postal_service_mongo_connected),
+                    NULL);
 
    if ((peer = neo_service_get_peer(NEO_SERVICE(base), "metrics"))) {
       priv->metrics = g_object_ref(peer);
