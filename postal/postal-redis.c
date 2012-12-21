@@ -127,6 +127,8 @@ postal_redis_start (NeoServiceBase *service,
 
          if (priv->host && priv->port) {
             priv->redis = redis_client_new();
+            g_message("Connecting to redis server at %s:%u",
+                      priv->host, priv->port);
             redis_client_connect_async(priv->redis,
                                        priv->host,
                                        priv->port,
