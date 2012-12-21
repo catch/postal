@@ -28,6 +28,9 @@
 #include "postal-metrics.h"
 #include "postal-service.h"
 
+#undef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "postal-service"
+
 #ifndef POSTAL_SERVICE_DM_CACHES
 #define POSTAL_SERVICE_DM_CACHES 20
 #endif
