@@ -1167,6 +1167,10 @@ postal_service_notify_cb (GObject      *object,
             g_assert_not_reached();
             break;
          }
+      } else {
+         g_message("Dropping duplicated message \"%s\" to device \"%s\"",
+                   postal_notification_get_collapse_key(notif),
+                   postal_device_get_device_token(device));
       }
 
       g_object_unref(device);
