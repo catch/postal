@@ -74,6 +74,7 @@ postal_service_should_ignore (PostalService      *service,
                               PostalNotification *notif)
 {
    PostalServicePrivate *priv;
+   const gchar *collapse;
    gboolean ret;
    guint i;
    guint idx;
@@ -97,11 +98,18 @@ postal_service_should_ignore (PostalService      *service,
     */
 
    /*
+    * Never ignore messages with a NULL collapse_key.
+    */
+   if (!(collapse = postal_notification_get_collapse_key(notif))) {
+      return FALSE;
+   }
+
+   /*
     * Build our collapse key for this device:message pair.
     */
    key = g_strdup_printf("%s:%s",
                          postal_device_get_device_token(device),
-                         postal_notification_get_collapse_key(notif));
+                         collapse);
 
    /*
     * Figure out the bucket for our active cache.
