@@ -1615,7 +1615,7 @@ postal_service_start (NeoServiceBase *base,
                             "auth-token", gcm_auth_token,
                             NULL);
 
-   g_message("MongoDB server is at %s", uri);
+   g_message("MongoDB server is at %s", uri ?: "mongodb://localhost:27107");
    priv->mongo = mongo_connection_new_from_uri(uri);
    g_signal_connect(priv->mongo,
                     "connected",
