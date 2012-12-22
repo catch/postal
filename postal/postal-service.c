@@ -1317,6 +1317,112 @@ postal_service_notify_finish (PostalService  *service,
 }
 
 static void
+postal_service_set_user_badge_cb (GObject      *object,
+                                  GAsyncResult *result,
+                                  gpointer      user_data)
+{
+   GSimpleAsyncResult *simple = user_data;
+   MongoConnection *connection = (MongoConnection *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_assert(MONGO_IS_CONNECTION(connection));
+   g_assert(G_IS_SIMPLE_ASYNC_RESULT(simple));
+
+   if (!mongo_connection_update_finish(connection, result, NULL, &error)) {
+      g_simple_async_result_take_error(simple, error);
+      GOTO(failure);
+   }
+
+   /*
+    * TODO: Query for all the devices to be updated.
+    */
+
+   g_simple_async_result_set_op_res_gboolean(simple, TRUE);
+
+failure:
+   g_simple_async_result_complete_in_idle(simple);
+   g_object_unref(simple);
+
+   EXIT;
+}
+
+void
+postal_service_set_user_badge (PostalService       *service,
+                               const gchar         *user,
+                               guint                badge,
+                               GCancellable        *cancellable,
+                               GAsyncReadyCallback  callback,
+                               gpointer             user_data)
+{
+   PostalServicePrivate *priv;
+   GSimpleAsyncResult *simple;
+   MongoObjectId *oid;
+   MongoBson *q;
+   MongoBson *set;
+   MongoBson *u;
+
+   g_return_if_fail(POSTAL_IS_SERVICE(service));
+   g_return_if_fail(user);
+   g_return_if_fail(!cancellable || G_IS_CANCELLABLE(cancellable));
+   g_return_if_fail(callback);
+
+   priv = service->priv;
+
+   simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
+                                      postal_service_set_user_badge);
+   g_simple_async_result_set_check_cancellable(simple, cancellable);
+
+   q = mongo_bson_new_empty();
+   if ((oid = mongo_object_id_new_from_string(user))) {
+      mongo_bson_append_object_id(q, "user", oid);
+      mongo_object_id_free(oid);
+   } else {
+      mongo_bson_append_string(q, "user", user);
+   }
+
+   set = mongo_bson_new_empty();
+   mongo_bson_append_int(set, "badge", badge);
+
+   u = mongo_bson_new_empty();
+   mongo_bson_append_bson(u, "$set", set);
+
+   mongo_connection_update_async(priv->mongo,
+                                 priv->db_and_collection,
+                                 MONGO_UPDATE_MULTI_UPDATE,
+                                 q,
+                                 u,
+                                 cancellable,
+                                 postal_service_set_user_badge_cb,
+                                 simple);
+
+   mongo_bson_unref(set);
+   mongo_bson_unref(u);
+   mongo_bson_unref(q);
+}
+
+gboolean
+postal_service_set_user_badge_finish (PostalService  *service,
+                                      GAsyncResult   *result,
+                                      GError        **error)
+{
+   GSimpleAsyncResult *simple = (GSimpleAsyncResult *)result;
+   gboolean ret;
+
+   ENTRY;
+
+   g_return_val_if_fail(POSTAL_IS_SERVICE(service), FALSE);
+   g_return_val_if_fail(G_IS_SIMPLE_ASYNC_RESULT(simple), FALSE);
+
+   if (!(ret = g_simple_async_result_get_op_res_gboolean(simple))) {
+      g_simple_async_result_propagate_error(simple, error);
+   }
+
+   RETURN(ret);
+}
+
+static void
 postal_service_aps_identity_removed_cb (GObject      *object,
                                         GAsyncResult *result,
                                         gpointer      user_data)

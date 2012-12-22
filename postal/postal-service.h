@@ -94,6 +94,15 @@ gboolean       postal_service_remove_device_finish (PostalService        *servic
                                                     GError              **error);
 void           postal_service_set_config           (PostalService        *service,
                                                     GKeyFile             *config);
+void           postal_service_set_user_badge       (PostalService        *service,
+                                                    const gchar          *user,
+                                                    guint                 badge,
+                                                    GCancellable         *cancellable,
+                                                    GAsyncReadyCallback   callback,
+                                                    gpointer              user_data);
+gboolean       postal_service_set_user_badge_finish(PostalService        *service,
+                                                    GAsyncResult         *result,
+                                                    GError              **error);
 void           postal_service_notify               (PostalService        *service,
                                                     PostalNotification   *notification,
                                                     gchar               **users,
