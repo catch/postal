@@ -1372,6 +1372,7 @@ postal_service_set_user_badge_cb2 (GObject      *object,
                                        NULL,
                                        postal_service_set_user_badge_cb3,
                                        NULL);
+         postal_metrics_device_notified(service->priv->metrics, device);
          g_object_unref(identity);
          g_object_unref(device);
       }
