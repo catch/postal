@@ -20,6 +20,7 @@
 #include "config.h"
 #endif
 
+#include <glib/gi18n.h>
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
 #include <string.h>
@@ -564,6 +565,99 @@ postal_http_handle_v1_users_user_devices (UrlRouter         *router,
 }
 
 static void
+postal_http_set_user_badge_cb (GObject      *object,
+                               GAsyncResult *result,
+                               gpointer      user_data)
+{
+   PostalService *service = (PostalService *)object;
+   SoupMessage *message = user_data;
+   PostalHttp *http;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_assert(POSTAL_IS_SERVICE(service));
+   g_assert(SOUP_IS_MESSAGE(message));
+
+   http = g_object_get_data(G_OBJECT(message), "http");
+
+   if (!postal_service_set_user_badge_finish(service, result, &error)) {
+      postal_http_reply_error(http, message, error);
+      g_object_unref(message);
+      EXIT;
+   }
+
+   soup_message_set_status(message, SOUP_STATUS_OK);
+   soup_server_unpause_message(http->priv->server, message);
+   g_object_unref(message);
+
+   EXIT;
+}
+
+static void
+postal_http_handle_v1_users_user_badge (UrlRouter         *router,
+                                        SoupServer        *server,
+                                        SoupMessage       *message,
+                                        const gchar       *path,
+                                        GHashTable        *params,
+                                        GHashTable        *query,
+                                        SoupClientContext *client,
+                                        gpointer           user_data)
+{
+   const gchar *user;
+   PostalHttp *http = user_data;
+   JsonNode *node = NULL;
+   GError *error = NULL;
+   guint badge;
+
+   ENTRY;
+
+   g_assert(router);
+   g_assert(SOUP_IS_SERVER(server));
+   g_assert(SOUP_IS_MESSAGE(message));
+   g_assert(path);
+   g_assert(params);
+   g_assert(g_hash_table_contains(params, "user"));
+   g_assert(client);
+   g_assert(POSTAL_IS_HTTP(http));
+
+   user = g_hash_table_lookup(params, "user");
+
+   if (message->method == SOUP_METHOD_PUT) {
+      if (!(node = postal_http_parse_body(message, &error)) ||
+          !JSON_NODE_HOLDS_VALUE(node)) {
+         if (!error) {
+            error = g_error_new(JSON_PARSER_ERROR,
+                                JSON_PARSER_ERROR_UNKNOWN,
+                                _("JSON must contain integer."));
+         }
+         postal_http_reply_error(http, message, error);
+         GOTO(cleanup);
+      }
+      badge = json_node_get_int(node);
+      g_object_set_data(G_OBJECT(message), "http", http);
+      postal_service_set_user_badge(http->priv->service,
+                                    user,
+                                    badge,
+                                    NULL,
+                                    postal_http_set_user_badge_cb,
+                                    g_object_ref(message));
+      soup_server_pause_message(server, message);
+      EXIT;
+   }
+
+   soup_message_set_status(message, SOUP_STATUS_METHOD_NOT_ALLOWED);
+
+cleanup:
+   g_clear_error(&error);
+   if (node) {
+      json_node_free(node);
+   }
+
+   EXIT;
+}
+
+static void
 postal_http_notify_cb (GObject      *object,
                        GAsyncResult *result,
                        gpointer      user_data)
@@ -1031,6 +1125,10 @@ postal_http_init (PostalHttp *http)
    url_router_add_handler(http->priv->router,
                           "/status",
                           postal_http_handle_status,
+                          http);
+   url_router_add_handler(http->priv->router,
+                          "/v1/users/:user/badge",
+                          postal_http_handle_v1_users_user_badge,
                           http);
    url_router_add_handler(http->priv->router,
                           "/v1/users/:user/devices",
