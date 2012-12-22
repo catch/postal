@@ -1349,10 +1349,8 @@ postal_service_set_user_badge_cb2 (GObject      *object,
    PushApsIdentity *identity;
    PushApsMessage *message;
    PostalService *service = user_data;
-   MongoBsonIter iter;
-   const gchar *device_token;
+   PostalDevice *device;
    GList *list;
-   guint badge;
 
    ENTRY;
 
@@ -1360,22 +1358,22 @@ postal_service_set_user_badge_cb2 (GObject      *object,
       message = push_aps_message_new();
       list = mongo_message_reply_get_documents(reply);
       for (; list; list = list->next) {
-         if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
-            device_token = mongo_bson_iter_get_value_string(&iter, NULL);
-            badge = 0;
-            if (mongo_bson_iter_init_find(&iter, list->data, "badge")) {
-               badge = mongo_bson_iter_get_value_int(&iter);
-            }
-            push_aps_message_set_badge(message, badge);
-            identity = push_aps_identity_new(device_token);
-            push_aps_client_deliver_async(service->priv->aps,
-                                          identity,
-                                          message,
-                                          NULL,
-                                          postal_service_set_user_badge_cb3,
-                                          NULL);
-            g_object_unref(identity);
+         device = postal_device_new();
+         if (!postal_device_load_from_bson(device, list->data, NULL)) {
+            g_object_unref(device);
+            continue;
          }
+         push_aps_message_set_badge(message,
+                                    postal_device_get_badge(device));
+         identity = push_aps_identity_new(postal_device_get_device_token(device));
+         push_aps_client_deliver_async(service->priv->aps,
+                                       identity,
+                                       message,
+                                       NULL,
+                                       postal_service_set_user_badge_cb3,
+                                       NULL);
+         g_object_unref(identity);
+         g_object_unref(device);
       }
       g_object_unref(message);
       g_object_unref(reply);
