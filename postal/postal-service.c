@@ -1383,6 +1383,11 @@ postal_service_set_user_badge (PostalService       *service,
    } else {
       mongo_bson_append_string(q, "user", user);
    }
+   /*
+    * Currently, only APS supports the concept of a "badge".
+    * We can open this up to others eventually.
+    */
+   mongo_bson_append_string(q, "device_type", "aps");
 
    set = mongo_bson_new_empty();
    mongo_bson_append_int(set, "badge", badge);
