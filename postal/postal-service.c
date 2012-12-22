@@ -1319,12 +1319,82 @@ postal_service_notify_finish (PostalService  *service,
 }
 
 static void
+postal_service_set_user_badge_cb3 (GObject      *object,
+                                   GAsyncResult *result,
+                                   gpointer      user_data)
+{
+   PushApsClient *client = (PushApsClient *)object;
+   GError *error = NULL;
+
+   ENTRY;
+
+   g_assert(PUSH_IS_APS_CLIENT(client));
+
+   if (!push_aps_client_deliver_finish(client, result, &error)) {
+      g_warning("%s", error->message);
+      g_error_free(error);
+      EXIT;
+   }
+
+   EXIT;
+}
+
+static void
+postal_service_set_user_badge_cb2 (GObject      *object,
+                                   GAsyncResult *result,
+                                   gpointer      user_data)
+{
+   MongoMessageReply *reply;
+   MongoConnection *connection = (MongoConnection *)object;
+   PushApsIdentity *identity;
+   PushApsMessage *message;
+   PostalService *service = user_data;
+   MongoBsonIter iter;
+   const gchar *device_token;
+   GList *list;
+   guint badge;
+
+   ENTRY;
+
+   if ((reply = mongo_connection_query_finish(connection, result, NULL))) {
+      message = push_aps_message_new();
+      list = mongo_message_reply_get_documents(reply);
+      for (; list; list = list->next) {
+         if (mongo_bson_iter_init_find(&iter, list->data, "device_token")) {
+            device_token = mongo_bson_iter_get_value_string(&iter, NULL);
+            badge = 0;
+            if (mongo_bson_iter_init_find(&iter, list->data, "badge")) {
+               badge = mongo_bson_iter_get_value_int(&iter);
+            }
+            push_aps_message_set_badge(message, badge);
+            identity = push_aps_identity_new(device_token);
+            push_aps_client_deliver_async(service->priv->aps,
+                                          identity,
+                                          message,
+                                          NULL,
+                                          postal_service_set_user_badge_cb3,
+                                          NULL);
+            g_object_unref(identity);
+         }
+      }
+      g_object_unref(message);
+      g_object_unref(reply);
+   }
+
+   g_object_unref(service);
+
+   EXIT;
+}
+
+static void
 postal_service_set_user_badge_cb (GObject      *object,
                                   GAsyncResult *result,
                                   gpointer      user_data)
 {
    GSimpleAsyncResult *simple = user_data;
    MongoConnection *connection = (MongoConnection *)object;
+   PostalService *service;
+   MongoBson *q;
    GError *error = NULL;
 
    ENTRY;
@@ -1337,9 +1407,20 @@ postal_service_set_user_badge_cb (GObject      *object,
       GOTO(failure);
    }
 
-   /*
-    * TODO: Query for all the devices to be updated.
-    */
+   if ((q = g_object_get_data(G_OBJECT(simple), "query"))) {
+      service = POSTAL_SERVICE(g_async_result_get_source_object(G_ASYNC_RESULT(simple)));
+      mongo_connection_query_async(service->priv->mongo,
+                                   service->priv->db_and_collection,
+                                   MONGO_QUERY_NONE,
+                                   0,
+                                   0,
+                                   q,
+                                   NULL,
+                                   NULL,
+                                   postal_service_set_user_badge_cb2,
+                                   g_object_ref(service));
+      g_object_unref(service);
+   }
 
    g_simple_async_result_set_op_res_gboolean(simple, TRUE);
 
@@ -1364,6 +1445,7 @@ postal_service_set_user_badge (PostalService       *service,
    MongoBson *q;
    MongoBson *set;
    MongoBson *u;
+   GTimeVal tv;
 
    g_return_if_fail(POSTAL_IS_SERVICE(service));
    g_return_if_fail(user);
@@ -1375,6 +1457,8 @@ postal_service_set_user_badge (PostalService       *service,
    simple = g_simple_async_result_new(G_OBJECT(service), callback, user_data,
                                       postal_service_set_user_badge);
    g_simple_async_result_set_check_cancellable(simple, cancellable);
+
+   g_get_current_time(&tv);
 
    q = mongo_bson_new_empty();
    if ((oid = mongo_object_id_new_from_string(user))) {
@@ -1391,9 +1475,15 @@ postal_service_set_user_badge (PostalService       *service,
 
    set = mongo_bson_new_empty();
    mongo_bson_append_int(set, "badge", badge);
+   mongo_bson_append_timeval(set, "modified_at", &tv);
 
    u = mongo_bson_new_empty();
    mongo_bson_append_bson(u, "$set", set);
+
+   g_object_set_data_full(G_OBJECT(simple),
+                          "query",
+                          mongo_bson_ref(q),
+                          (GDestroyNotify)mongo_bson_unref);
 
    mongo_connection_update_async(priv->mongo,
                                  priv->db_and_collection,
