@@ -25,6 +25,7 @@ G_DEFINE_TYPE(PostalDevice, postal_device, G_TYPE_OBJECT)
 
 struct _PostalDevicePrivate
 {
+   guint             badge;
    GTimeVal          created_at;
    gchar            *device_token;
    PostalDeviceType  device_type;
@@ -35,6 +36,7 @@ struct _PostalDevicePrivate
 enum
 {
    PROP_0,
+   PROP_BADGE,
    PROP_DEVICE_TOKEN,
    PROP_DEVICE_TYPE,
    PROP_USER,
@@ -77,6 +79,22 @@ PostalDevice *
 postal_device_new (void)
 {
    return g_object_new(POSTAL_TYPE_DEVICE, NULL);
+}
+
+guint
+postal_device_get_badge (PostalDevice *device)
+{
+   g_return_val_if_fail(POSTAL_IS_DEVICE(device), 0);
+   return device->priv->badge;
+}
+
+void
+postal_device_set_badge (PostalDevice *device,
+                         guint         badge)
+{
+   g_return_if_fail(POSTAL_IS_DEVICE(device));
+   device->priv->badge = badge;
+   g_object_notify_by_pspec(G_OBJECT(device), gParamSpecs[PROP_BADGE]);
 }
 
 /**
@@ -560,6 +578,9 @@ postal_device_load_from_json (PostalDevice  *device,
                   str);
       RETURN(FALSE);
    }
+
+   g_object_freeze_notify(G_OBJECT(device));
+
    postal_device_set_device_type_string(device, str);
 
    str = json_object_get_string_member(obj, "device_token");
@@ -581,6 +602,13 @@ postal_device_load_from_json (PostalDevice  *device,
       g_time_val_from_iso8601(str, &tv);
       postal_device_set_created_at(device, &tv);
    }
+
+   if (json_object_has_member(obj, "badge")) {
+      postal_device_set_badge(device,
+                              json_object_get_int_member(obj, "badge"));
+   }
+
+   g_object_thaw_notify(G_OBJECT(device));
 
    RETURN(TRUE);
 }
@@ -611,6 +639,9 @@ postal_device_get_property (GObject    *object,
    PostalDevice *device = POSTAL_DEVICE(object);
 
    switch (prop_id) {
+   case PROP_BADGE:
+      g_value_set_uint(value, postal_device_get_badge(device));
+      break;
    case PROP_DEVICE_TOKEN:
       g_value_set_string(value, postal_device_get_device_token(device));
       break;
@@ -634,6 +665,9 @@ postal_device_set_property (GObject      *object,
    PostalDevice *device = POSTAL_DEVICE(object);
 
    switch (prop_id) {
+   case PROP_BADGE:
+      postal_device_set_badge(device, g_value_get_uint(value));
+      break;
    case PROP_DEVICE_TOKEN:
       postal_device_set_device_token(device, g_value_get_string(value));
       break;
@@ -660,6 +694,17 @@ postal_device_class_init (PostalDeviceClass *klass)
    object_class->get_property = postal_device_get_property;
    object_class->set_property = postal_device_set_property;
    g_type_class_add_private(object_class, sizeof(PostalDevicePrivate));
+
+   gParamSpecs[PROP_BADGE] =
+      g_param_spec_uint("badge",
+                        _("Badge"),
+                        _("The badge for the device."),
+                        0,
+                        G_MAXUINT,
+                        0,
+                        G_PARAM_READWRITE);
+   g_object_class_install_property(object_class, PROP_BADGE,
+                                   gParamSpecs[PROP_BADGE]);
 
    gParamSpecs[PROP_DEVICE_TOKEN] =
       g_param_spec_string("device-token",

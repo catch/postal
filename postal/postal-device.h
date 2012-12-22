@@ -71,6 +71,7 @@ struct _PostalDeviceClass
 };
 
 GQuark            postal_device_error_quark      (void) G_GNUC_CONST;
+guint             postal_device_get_badge        (PostalDevice      *device);
 GTimeVal         *postal_device_get_created_at   (PostalDevice      *device);
 const gchar      *postal_device_get_device_token (PostalDevice      *device);
 PostalDeviceType  postal_device_get_device_type  (PostalDevice      *device);
@@ -88,6 +89,8 @@ MongoBson        *postal_device_save_to_bson     (PostalDevice      *device,
                                                   GError           **error);
 JsonNode         *postal_device_save_to_json     (PostalDevice      *device,
                                                   GError           **error);
+void              postal_device_set_badge        (PostalDevice      *device,
+                                                  guint              badge);
 void              postal_device_set_created_at   (PostalDevice      *device,
                                                   GTimeVal          *created_at);
 void              postal_device_set_device_token (PostalDevice      *device,
