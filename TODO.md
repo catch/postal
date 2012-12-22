@@ -1,8 +1,6 @@
 # Things we need immediately.
 
  * Python drivers for twisted and urllib.
- * Setting "badge" field of device, automatically sends notification
-   if necessary.
  * Setting of extra fields. There are cases where you might want to
    tag a device with something like an account_level, or group id.
    This should allow for delivering to devices matching this key.
