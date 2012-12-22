@@ -1136,6 +1136,8 @@ postal_service_notify_cb (GObject      *object,
             aps = g_object_new(PUSH_TYPE_APS_IDENTITY,
                                "device-token", device_token,
                                NULL);
+            push_aps_message_set_badge(aps_message,
+                                       postal_device_get_badge(device));
             push_aps_client_deliver_async(priv->aps,
                                           aps,
                                           aps_message,
