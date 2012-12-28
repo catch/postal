@@ -1023,8 +1023,6 @@ mongo_protocol_finalize (GObject *object)
       g_hash_table_unref(hash);
    }
 
-   g_printerr("REFCOUNT: %u\n", G_OBJECT(priv->input_stream)->ref_count);
-
    g_clear_object(&priv->shutdown);
    g_clear_object(&priv->input_stream);
    g_clear_object(&priv->output_stream);
