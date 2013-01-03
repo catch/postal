@@ -1534,7 +1534,7 @@ postal_service_aps_identity_removed_cb (GObject      *object,
                                        result,
                                        NULL,
                                        &error)) {
-      g_message("Device removal failed: %s\n", error->message);
+      g_warning("Device removal failed: %s\n", error->message);
       g_error_free(error);
    }
 
@@ -1604,7 +1604,7 @@ postal_service_c2dm_identity_removed_cb (GObject      *object,
                                        result,
                                        NULL,
                                        &error)) {
-      g_message("Device removal failed: %s\n", error->message);
+      g_warning("Device removal failed: %s\n", error->message);
       g_error_free(error);
    }
 
@@ -1674,7 +1674,7 @@ postal_service_gcm_identity_removed_cb (GObject      *object,
                                        result,
                                        NULL,
                                        &error)) {
-      g_message("Device removal failed: %s\n", error->message);
+      g_warning("Device removal failed: %s\n", error->message);
       g_error_free(error);
    }
 
