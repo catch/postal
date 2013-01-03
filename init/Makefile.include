@@ -1,5 +1,0 @@
-if HAVE_SYSTEMD
-etcsysconfigdir = /etc/sysconfig
-etcsysconfig_DATA = $(top_srcdir)/init/sysconfig/postald
-systemdsystemunit_DATA = $(top_srcdir)/init/postald.service
-endif

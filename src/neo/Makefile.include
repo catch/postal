@@ -1,0 +1,24 @@
+noinst_LTLIBRARIES += libneo.la
+
+libneo_la_SOURCES =
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-application.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-application.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-debug.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger-daily.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger-daily.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger-unix.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-logger-unix.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-service.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-service.h
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-service-base.c
+libneo_la_SOURCES += $(top_srcdir)/src/neo/neo-service-base.h
+
+libneo_la_CPPFLAGS =
+libneo_la_CPPFLAGS += $(GIO_CFLAGS)
+libneo_la_CPPFLAGS += -DG_LOG_DOMAIN="\"neo\""
+
+libneo_la_LIBADD =
+libneo_la_LIBADD += $(GIO_LIBS)

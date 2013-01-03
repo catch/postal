@@ -1,14 +1,14 @@
 noinst_LTLIBRARIES =
 
 include Makefile.tests
-include init/Makefile.include
-include mongo-glib/Makefile.include
-include neo/Makefile.include
-include postal/Makefile.include
-include push-glib/Makefile.include
-include redis-glib/Makefile.include
+include data/init/Makefile.include
+include src/mongo-glib/Makefile.include
+include src/neo/Makefile.include
+include src/postal/Makefile.include
+include src/push-glib/Makefile.include
+include src/redis-glib/Makefile.include
+include src/tools/Makefile.include
 include tests/Makefile.include
-include tools/Makefile.include
 
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 DISTCHECK_CONFIGURE_FLAGS = --enable-silent-rules --enable-debug=yes
@@ -22,7 +22,7 @@ postaldoc_DATA += README
 postaldoc_DATA += README.md
 
 sysconf_DATA =
-sysconf_DATA += conf/postald.conf
+sysconf_DATA += data/conf/postald.conf
 
 EXTRA_DIST += $(postaldoc_DATA)
 EXTRA_DIST += $(sysconf_DATA)

@@ -4,13 +4,13 @@ bin_PROGRAMS += postal-remove-device
 
 
 postal_add_device_SOURCES =
-postal_add_device_SOURCES += tools/postal-add-device.c
+postal_add_device_SOURCES += $(top_srcdir)/src/tools/postal-add-device.c
 
 postal_add_device_CPPFLAGS =
 postal_add_device_CPPFLAGS += $(JSON_CFLAGS)
 postal_add_device_CPPFLAGS += $(SOUP_CFLAGS)
-postal_add_device_CPPFLAGS += -I$(top_srcdir)
-postal_add_device_CPPFLAGS += -I$(top_srcdir)/mongo-glib
+postal_add_device_CPPFLAGS += -I$(top_srcdir)/src
+postal_add_device_CPPFLAGS += -I$(top_srcdir)/src/mongo-glib
 
 postal_add_device_LDADD =
 postal_add_device_LDADD += $(JSON_LIBS)
@@ -19,13 +19,13 @@ postal_add_device_LDADD += libpostal.la
 
 
 postal_get_devices_SOURCES =
-postal_get_devices_SOURCES += tools/postal-get-devices.c
+postal_get_devices_SOURCES += $(top_srcdir)/src/tools/postal-get-devices.c
 
 postal_get_devices_CPPFLAGS =
 postal_get_devices_CPPFLAGS += $(JSON_CFLAGS)
 postal_get_devices_CPPFLAGS += $(SOUP_CFLAGS)
-postal_get_devices_CPPFLAGS += -I$(top_srcdir)
-postal_get_devices_CPPFLAGS += -I$(top_srcdir)/mongo-glib
+postal_get_devices_CPPFLAGS += -I$(top_srcdir)/src
+postal_get_devices_CPPFLAGS += -I$(top_srcdir)/src/mongo-glib
 
 postal_get_devices_LDADD =
 postal_get_devices_LDADD += $(JSON_LIBS)
@@ -34,13 +34,13 @@ postal_get_devices_LDADD += libpostal.la
 
 
 postal_remove_device_SOURCES =
-postal_remove_device_SOURCES += tools/postal-remove-device.c
+postal_remove_device_SOURCES += $(top_srcdir)/src/tools/postal-remove-device.c
 
 postal_remove_device_CPPFLAGS =
 postal_remove_device_CPPFLAGS += $(JSON_CFLAGS)
 postal_remove_device_CPPFLAGS += $(SOUP_CFLAGS)
-postal_remove_device_CPPFLAGS += -I$(top_srcdir)
-postal_remove_device_CPPFLAGS += -I$(top_srcdir)/mongo-glib
+postal_remove_device_CPPFLAGS += -I$(top_srcdir)/src
+postal_remove_device_CPPFLAGS += -I$(top_srcdir)/src/mongo-glib
 
 postal_remove_device_LDADD =
 postal_remove_device_LDADD += $(JSON_LIBS)

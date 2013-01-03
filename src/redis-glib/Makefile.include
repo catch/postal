@@ -3,10 +3,10 @@ if ENABLE_REDIS
 noinst_LTLIBRARIES += libredis-glib.la
 
 libredis_glib_la_SOURCES =
-libredis_glib_la_SOURCES += $(top_srcdir)/redis-glib/redis-adapter.h
-libredis_glib_la_SOURCES += $(top_srcdir)/redis-glib/redis-client.c
-libredis_glib_la_SOURCES += $(top_srcdir)/redis-glib/redis-client.h
-libredis_glib_la_SOURCES += $(top_srcdir)/redis-glib/redis-glib.h
+libredis_glib_la_SOURCES += $(top_srcdir)/src/redis-glib/redis-adapter.h
+libredis_glib_la_SOURCES += $(top_srcdir)/src/redis-glib/redis-client.c
+libredis_glib_la_SOURCES += $(top_srcdir)/src/redis-glib/redis-client.h
+libredis_glib_la_SOURCES += $(top_srcdir)/src/redis-glib/redis-glib.h
 
 libredis_glib_la_CPPFLAGS =
 libredis_glib_la_CPPFLAGS += $(GIO_CFLAGS)

@@ -1,0 +1,58 @@
+bin_PROGRAMS = postald
+
+noinst_LTLIBRARIES += libpostal.la
+
+libpostal_la_SOURCES =
+libpostal_la_SOURCES += $(top_srcdir)/src/cut-n-paste/url-router.c
+libpostal_la_SOURCES += $(top_srcdir)/src/cut-n-paste/url-router.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-application.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-application.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-debug.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-dm-cache.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-dm-cache.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-device.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-device.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-http.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-http.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-metrics.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-metrics.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-notification.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-notification.h
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-service.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-service.h
+
+libpostal_la_CPPFLAGS =
+libpostal_la_CPPFLAGS += $(SOUP_CFLAGS)
+libpostal_la_CPPFLAGS += $(JSON_CFLAGS)
+libpostal_la_CPPFLAGS += -DG_LOG_DOMAIN="\"postal\""
+libpostal_la_CPPFLAGS += -DSYSCONFDIR="\"${sysconfdir}\""
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src/cut-n-paste
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src/mongo-glib
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src/neo
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src/push-glib
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src/redis-glib
+libpostal_la_CPPFLAGS += -I$(top_srcdir)/src
+
+libpostal_la_LIBADD =
+libpostal_la_LIBADD += $(SOUP_LIBS)
+libpostal_la_LIBADD += $(JSON_LIBS)
+libpostal_la_LIBADD += libmongo-glib.la
+libpostal_la_LIBADD += libneo.la
+libpostal_la_LIBADD += libpush-glib.la
+
+if ENABLE_REDIS
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-redis.c
+libpostal_la_SOURCES += $(top_srcdir)/src/postal/postal-redis.h
+libpostal_la_LIBADD += libredis-glib.la
+endif
+
+postald_SOURCES =
+postald_SOURCES += $(top_srcdir)/src/postal/main.c
+
+postald_CPPFLAGS =
+postald_CPPFLAGS += $(JSON_CFLAGS)
+postald_CPPFLAGS += $(SOUP_CFLAGS)
+postald_CPPFLAGS += -I$(top_srcdir)/src/neo
+
+postald_LDADD =
+postald_LDADD += libpostal.la
