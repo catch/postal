@@ -611,7 +611,7 @@ postal_service_find_devices_foreach (MongoCursor *cursor,
    device = postal_device_new();
 
    if (!postal_device_load_from_bson(device, bson, &error)) {
-      g_message("Failed to load device from BSON: %s", error->message);
+      g_warning("Failed to load device from BSON: %s", error->message);
       g_object_unref(device);
       RETURN(TRUE);
    }
@@ -1008,7 +1008,7 @@ postal_service_notify_c2dm_cb (GObject      *object,
    g_assert(PUSH_IS_C2DM_CLIENT(client));
 
    if (!push_c2dm_client_deliver_finish(client, result, &error)) {
-      g_message("%s", error->message);
+      g_warning("C2DM delivery failure: %s", error->message);
       g_error_free(error);
    }
 
@@ -1028,7 +1028,7 @@ postal_service_notify_gcm_cb (GObject      *object,
    g_assert(PUSH_IS_GCM_CLIENT(client));
 
    if (!push_gcm_client_deliver_finish(client, result, &error)) {
-      g_message("%s", error->message);
+      g_warning("GCM delivery failure: %s", error->message);
       g_error_free(error);
    }
 
@@ -1048,7 +1048,7 @@ postal_service_notify_aps_cb (GObject      *object,
    g_assert(PUSH_IS_APS_CLIENT(client));
 
    if (!push_aps_client_deliver_finish(client, result, &error)) {
-      g_message("%s", error->message);
+      g_warning("APS delivery failure: %s", error->message);
       g_error_free(error);
    }
 
@@ -1732,7 +1732,8 @@ static void
 postal_service_mongo_connected (MongoConnection *connection,
                                 gpointer         user_data)
 {
-   g_message("Connection to MongoDB established.");
+   ENTRY;
+   EXIT;
 }
 
 /**
@@ -1817,7 +1818,6 @@ postal_service_start (NeoServiceBase *base,
                             "auth-token", gcm_auth_token,
                             NULL);
 
-   g_message("MongoDB server is at %s", uri ?: "mongodb://localhost:27107");
    priv->mongo = mongo_connection_new_from_uri(uri);
    g_signal_connect(priv->mongo,
                     "connected",
