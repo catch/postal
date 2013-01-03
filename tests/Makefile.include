@@ -1,10 +1,28 @@
 noinst_PROGRAMS =
+noinst_PROGRAMS += test-mongo-bson
+noinst_PROGRAMS += test-mongo-connection
+noinst_PROGRAMS += test-mongo-collection
+noinst_PROGRAMS += test-mongo-cursor
+noinst_PROGRAMS += test-mongo-manager
+noinst_PROGRAMS += test-mongo-message-insert
+noinst_PROGRAMS += test-mongo-message-reply
+noinst_PROGRAMS += test-mongo-object-id
+noinst_PROGRAMS += test-mongo-protocol
 noinst_PROGRAMS += test-postal-device
 noinst_PROGRAMS += test-postal-dm-cache
 noinst_PROGRAMS += test-postal-http
 noinst_PROGRAMS += test-postal-service
 noinst_PROGRAMS += test-url-router
 
+TEST_PROGS += test-mongo-bson
+TEST_PROGS += test-mongo-connection
+TEST_PROGS += test-mongo-collection
+TEST_PROGS += test-mongo-cursor
+TEST_PROGS += test-mongo-manager
+TEST_PROGS += test-mongo-message-insert
+TEST_PROGS += test-mongo-message-reply
+TEST_PROGS += test-mongo-object-id
+TEST_PROGS += test-mongo-protocol
 TEST_PROGS += test-postal-device
 TEST_PROGS += test-postal-dm-cache
 TEST_PROGS += test-postal-http
@@ -30,3 +48,42 @@ test_postal_service_LDADD = libpostal.la
 test_url_router_SOURCES = tests/test-url-router.c
 test_url_router_CPPFLAGS = -I$(top_srcdir) $(SOUP_CFLAGS)
 test_url_router_LDADD = libpostal.la
+
+test_mongo_bson_SOURCES = $(top_srcdir)/tests/test-mongo-bson.c
+test_mongo_bson_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS) '-DSRC_DIR="$(top_srcdir)"'
+test_mongo_bson_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_connection_SOURCES = $(top_srcdir)/tests/test-mongo-connection.c
+test_mongo_connection_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_connection_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_collection_SOURCES = $(top_srcdir)/tests/test-mongo-collection.c
+test_mongo_collection_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_collection_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_cursor_SOURCES = $(top_srcdir)/tests/test-mongo-cursor.c
+test_mongo_cursor_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_cursor_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_object_id_SOURCES = $(top_srcdir)/tests/test-mongo-object-id.c
+test_mongo_object_id_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_object_id_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_protocol_SOURCES = $(top_srcdir)/tests/test-mongo-protocol.c
+test_mongo_protocol_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_protocol_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_manager_SOURCES = $(top_srcdir)/tests/test-mongo-manager.c
+test_mongo_manager_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_manager_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_message_insert_SOURCES = $(top_srcdir)/tests/test-mongo-message-insert.c
+test_mongo_message_insert_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_message_insert_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+test_mongo_message_reply_SOURCES = $(top_srcdir)/tests/test-mongo-message-reply.c
+test_mongo_message_reply_CPPFLAGS = $(GIO_CFLAGS) $(GOBJECT_CFLAGS)
+test_mongo_message_reply_LDADD = $(GIO_LIBS) $(GOBJECT_LIBS) $(top_builddir)/libmongo-glib.la
+
+EXTRA_DIST += $(top_srcdir)/tests/bson/*.bson
+EXTRA_DIST += $(top_srcdir)/tests/test-helper.h

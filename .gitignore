@@ -28,6 +28,15 @@ stamp-h1
 postal-add-device
 postal-get-devices
 postal-remove-device
+test-mongo-bson
+test-mongo-collection
+test-mongo-connection
+test-mongo-cursor
+test-mongo-manager
+test-mongo-message-insert
+test-mongo-message-reply
+test-mongo-object-id
+test-mongo-protocol
 test-postal-device
 test-postal-dm-cache
 test-postal-http
